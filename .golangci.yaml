@@ -1,0 +1,50 @@
+run:
+  # default concurrency is available CPU number
+  concurrency: 4
+
+  # timeout for analysis, e.g. 30s, 5m, default is 1m
+  timeout: 1m
+
+  # exit code when at least one issue was found, default is 1
+  issues-exit-code: 1
+
+  # include test files or not, default is true
+  tests: true
+
+  # Fix found issues (if it's supported by the linter)
+  fix: true
+
+linters:
+  enable-all: true
+  disable:
+    - exhaustivestruct
+    - noctx
+
+linters-settings:
+  lll:
+    # max line length, lines longer will be reported.
+    # Note how [Effective Go](https://go.dev/doc/effective_go#formatting) doesn't recommend a fixed maximum:
+    # > Go has no line length limit. Don't worry about overflowing a punched card.
+    # > If a line feels too long, wrap it and indent with an extra tab.
+    # Set the length to a large number, if it's that long you should wonder if wrapping wouldn't make sense
+    line-length: 300
+    # '\t' is counted as 1 character by default, and can be changed with the tab-width option
+    # tab width in spaces. Default to 1.
+    tab-width: 1
+
+  tagliatelle:
+    # check the struck tag name case
+    case:
+      # use the struct field name to check the name of the struct tag
+      use-field-name: true
+      rules:
+        # any struct tag type can be used.
+        # support string case: `camel`, `pascal`, `kebab`, `snake`, `goCamel`, `goPascal`, `goKebab`, `goSnake`, `upper`, `lower`
+        json: snake
+        yaml: camel
+        xml: camel
+        bson: camel
+        avro: snake
+        mapstructure: kebab
+
+

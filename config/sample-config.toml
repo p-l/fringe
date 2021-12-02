@@ -1,0 +1,19 @@
+[fringe]
+# Limit users accepted with email from this domain
+# allowed-domain = "yourdomain.com"
+
+# Secret used to protect the JWT used after authentication.
+# secret = "<SOME RANDOME SECRET STRING>"
+
+[radius]
+# Set a radius secret to be share between client and server
+# should be a different scret from the fringe secret
+# secret = "<SOME RANDOM SECRET STRING>"
+
+[http]
+# Set what root url should be used for HTTP redirect.
+# root-url = "https://id.yourdomain.com"
+
+[google-oauth]
+# client-id = "GOOGLE_PROVIDED_CLIENT_ID.apps.googleusercontent.com"
+# client-secret = "GOOGLE_PROVIDED_CLIENT_SECRET"
