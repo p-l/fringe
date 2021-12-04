@@ -8,9 +8,7 @@ import (
 	"time"
 
 	"github.com/alexedwards/argon2id"
-
-	// select sqlite3 driver for database/sql.
-	_ "github.com/mattn/go-sqlite3"
+	"modernc.org/ql"
 )
 
 // Repository stores and access data in a sqlite database.
@@ -19,17 +17,69 @@ type Repository struct {
 }
 
 func createTables(db *sql.DB) error {
-	_, err := db.Exec("CREATE TABLE IF NOT EXISTS users (" +
-		"email TEXT PRIMARY KEY NOT NULL, " +
-		"password TEXT NOT NULL, " +
-		"created_at INTEGER, " +
-		"updated_at INTEGER, " +
-		"lastseen_at INTEGER)")
+	createTx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("could not create transaction %w", err)
+	}
+
+	_, err = createTx.Exec("CREATE TABLE IF NOT EXISTS users (" +
+		"email string NOT NULL, " +
+		"password string NOT NULL, " +
+		"created_at int, " +
+		"updated_at int, " +
+		"last_seen_at int)")
 	if err != nil {
 		return fmt.Errorf("could not create user table: %w", err)
 	}
 
+	_, err = createTx.Exec("CREATE INDEX IF NOT EXISTS idx_users_email ON users (email)")
+	if err != nil {
+		return fmt.Errorf("could not create user:email index: %w", err)
+	}
+
+	err = createTx.Commit()
+	if err != nil {
+		return fmt.Errorf("could not commit user table and index: %w", err)
+	}
+
 	return nil
+}
+
+type dbUser struct {
+	Email      string
+	Password   string
+	CreatedAt  int
+	UpdatedAt  int
+	LastSeenAt int
+}
+
+func (r *Repository) userByEmail(findEmail string) (user *dbUser, err error) {
+	find, err := r.db.Prepare("SELECT email,password,created_at,updated_at,last_seen_at FROM users WHERE email == $1 LIMIT 1;") //nolint:sqlclosecheck
+	if err != nil {
+		return nil, fmt.Errorf("could not prepare select statement: %w", err)
+	}
+	defer closeStatement(find)
+
+	rows, err := find.Query(findEmail) //nolint:sqlclosecheck,rowserrcheck
+	defer closeRows(rows)
+
+	if err != nil {
+		return nil, fmt.Errorf("could execute select for user %s: %w", findEmail, err)
+	}
+
+	var u dbUser
+	for rows.Next() {
+		err := rows.Scan(&u.Email, &u.Password, &u.CreatedAt, &u.UpdatedAt, &u.LastSeenAt)
+		if err != nil {
+			return nil, fmt.Errorf("could not read data from user row for user %s: %w", findEmail, err)
+		}
+
+		if findEmail == u.Email {
+			return &u, nil
+		}
+	}
+
+	return nil, nil
 }
 
 func hashPassword(password string) (string, error) {
@@ -69,10 +119,12 @@ func validatePasswordAgainstHash(password string, hash string) bool {
 }
 
 // NewRepository returns Repository with a new database connexion.
-func NewRepository() (*Repository, error) {
-	connexion, err := sql.Open("sqlite3", "./fringe.db")
+func NewRepository(location string) (*Repository, error) {
+	ql.RegisterDriver()
+
+	connexion, err := sql.Open("ql", location)
 	if err != nil {
-		return nil, fmt.Errorf("could not open or create ./fringe.db: %w", err)
+		return nil, fmt.Errorf("could not open or create at %s: %w", location, err)
 	}
 
 	err = createTables(connexion)
@@ -90,23 +142,44 @@ func (r *Repository) CreateUser(email string, password string) (bool, error) {
 		return false, err
 	}
 
-	now := time.Now()
-	// Insert or update record in the database
-	insert, err := r.db.Prepare("INSERT OR IGNORE INTO users (email, password, created_at, updated_at, lastseen_at) VALUES (?,?,?,?,?)") //nolint:sqlclosecheck
-	defer closeStatement(insert)
+	user, err := r.userByEmail(email)
+	if err != nil {
+		return false, err
+	}
 
+	if user != nil {
+		// User not created as it already exists
+		return false, nil
+	}
+
+	// Create User
+	insertTx, err := r.db.Begin()
+	if err != nil {
+		return false, err
+	}
+
+	now := time.Now()
+
+	// Insert record in the database
+	insert, err := insertTx.Prepare("INSERT INTO users (email, password, created_at, updated_at, last_seen_at) VALUES ($1,$2,$3,$4,$5)") //nolint:sqlclosecheck
 	if err != nil {
 		return false, fmt.Errorf("could not prepare user insert statement: %w", err)
 	}
+	defer closeStatement(insert)
 
 	result, err := insert.Exec(email, hash, now.Unix(), now.Unix(), now.Unix())
 	if err != nil {
 		return false, fmt.Errorf("insert user statement failed: %w", err)
 	}
 
+	err = insertTx.Commit()
+	if err != nil {
+		return false, err
+	}
+
 	lastInsertID, _ := result.LastInsertId()
 	rowsAffected, _ := result.RowsAffected()
-	log.Printf("INSERT: LastInsertID: %d, RowsAffected: %d", lastInsertID, rowsAffected)
+	log.Printf("INSERT new user:%s, rowID: %d, RowsAffected: %d", email, lastInsertID, rowsAffected)
 
 	return rowsAffected >= 1, nil
 }
@@ -119,19 +192,27 @@ func (r *Repository) UpdateUserPassword(email string, password string) (bool, er
 		return false, err
 	}
 
+	updateTx, err := r.db.Begin()
+	if err != nil {
+		return false, fmt.Errorf("cloud not being transaction: %w", err)
+	}
+
 	now := time.Now()
 	// Insert or update record in the database
-	insert, err := r.db.Prepare("UPDATE users SET password = ?,  updated_at = ?, lastseen_at = ? WHERE email = ?") //nolint:sqlclosecheck
-	defer closeStatement(insert)
-
+	stmt, err := updateTx.Prepare("UPDATE users SET password = $1, updated_at = $2, last_seen_at = $3 WHERE email == $4") //nolint:sqlclosecheck
 	if err != nil {
 		return false, fmt.Errorf("cloud not prepaer update statement: %w", err)
 	}
 
-	result, err := insert.Exec(hash, now.Unix(), now.Unix(), email)
-	if err != nil {
-		log.Printf("user %s password update failed: %v", email, err)
+	defer closeStatement(stmt)
 
+	result, err := stmt.Exec(hash, now.Unix(), now.Unix(), email)
+	if err != nil {
+		return false, fmt.Errorf("user %s password update failed: %w", email, err)
+	}
+
+	err = updateTx.Commit()
+	if err != nil {
 		return false, fmt.Errorf("user %s password update failed: %w", email, err)
 	}
 
@@ -140,11 +221,16 @@ func (r *Repository) UpdateUserPassword(email string, password string) (bool, er
 	return rowsAffected >= 1, nil
 }
 
-// TouchUser updates user's lastseen_at value with current Unix time.
+// TouchUser updates user's last_seen_at value with current Unix time.
 func (r *Repository) TouchUser(email string) (bool, error) {
 	now := time.Now()
 
-	update, err := r.db.Prepare("UPDATE users SET lastseen_at = ? WHERE email = ?") //nolint:sqlclosecheck
+	updateTx, err := r.db.Begin()
+	if err != nil {
+		return false, fmt.Errorf("could not prepare transaction: %w", err)
+	}
+
+	update, err := updateTx.Prepare("UPDATE users SET last_seen_at = $1 WHERE email == $2") //nolint:sqlclosecheck
 	defer closeStatement(update)
 
 	if err != nil {
@@ -154,6 +240,11 @@ func (r *Repository) TouchUser(email string) (bool, error) {
 	result, err := update.Exec(now.Unix(), email)
 	if err != nil {
 		return false, fmt.Errorf("last seen update has failed: %w", err)
+	}
+
+	err = updateTx.Commit()
+	if err != nil {
+		return false, fmt.Errorf("last_seen_at commit failed: %w", err)
 	}
 
 	rowsAffected, err := result.RowsAffected()
