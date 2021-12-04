@@ -1,5 +1,8 @@
-# Mac OS X files
+# macOS files
 .DS_Store
+
+# IntelliJ/GoLand
+.idea/
 
 # Binaries for programs and plugins
 *.exe
@@ -10,6 +13,7 @@
 
 # Build output
 bin/
+artifacts/
 
 # Test binary, built with `go test -c`
 *.test
@@ -18,10 +22,10 @@ bin/
 *.out
 
 # Dependency directories (remove the comment below to include it)
-# vendor/
+vendor/
 
 # Configuration used fringeg development
 /config.toml
 
-# Databases
-*.db
+# Development databases
+/db/

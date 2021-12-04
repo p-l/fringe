@@ -5,15 +5,23 @@
 # Secret used to protect the JWT used after authentication.
 # secret = "<SOME RANDOME SECRET STRING>"
 
+[database]
+# Database location
+# database = /var/lib/fringe/fringe.db
+
 [radius]
-# Set a radius secret to be share between client and server
-# should be a different scret from the fringe secret
+# Set a radius secret to be share between client and server should be a different secret from the fringe secret
 # secret = "<SOME RANDOM SECRET STRING>"
 
 [http]
+# Fringe must be behind an ngnix reverse proxy with TLS enabled (using https://letsencrypt.org is probably the easiest)
 # Set what root url should be used for HTTP redirect.
-# root-url = "https://id.yourdomain.com"
+# root-url = "https://fringe.yourdomain.com"
 
 [google-oauth]
+# You must create an OAuth application in the Google Developer Console
+# -> Instructions can be found here: https://support.google.com/cloud/answer/6158849?hl=en
+# The callback URL must be what you place in the http root-url config followed by /auth/google/callback/
+#
 # client-id = "GOOGLE_PROVIDED_CLIENT_ID.apps.googleusercontent.com"
 # client-secret = "GOOGLE_PROVIDED_CLIENT_SECRET"
