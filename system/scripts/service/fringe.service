@@ -1,0 +1,21 @@
+# If you modify this, please also make sure to edit init.sh
+
+[Unit]
+Description=Fringe is a radius bridge for Google OAuth"
+Documentation=https://github.com/p-l/fringe
+After=network-online.target
+
+[Service]
+User=fringe
+Group=fringe
+LimitNOFILE=65536
+EnvironmentFile=-/etc/default/fringe
+ExecStart=/usr/lib/fringe/scripts/fringe-systemd.sh
+KillMode=control-group
+Restart=on-failure
+Type=forking
+PIDFile=/var/lib/fringe/fringe.pid
+
+[Install]
+WantedBy=multi-user.target
+Alias=fringe.service
