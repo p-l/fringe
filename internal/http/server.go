@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -14,7 +15,7 @@ import (
 
 	"github.com/dchest/uniuri"
 	"github.com/golang-jwt/jwt"
-	"github.com/p-l/fringe/internal/db"
+	"github.com/p-l/fringe/internal/repositories"
 )
 
 type googleAuthResponse struct {
@@ -46,7 +47,7 @@ const (
 )
 
 // ServeHTTP Starts blocking HTTP server.
-func ServeHTTP(repo *db.Repository, rootURL string, googleClientID string, googleClientSecret string, allowedDomain string, jwtSecret string) {
+func ServeHTTP(repo *repositories.UserRepository, rootURL string, googleClientID string, googleClientSecret string, allowedDomain string, jwtSecret string) {
 	googleRedirectURI := fmt.Sprintf("%s/auth/google/callback", rootURL)
 
 	http.HandleFunc("/", func(httpWriter http.ResponseWriter, httpRequest *http.Request) {
@@ -92,9 +93,7 @@ func fetchGoogleTokenFromCallbackCode(code string, googleClientID string, google
 	}
 
 	var googleAuth googleAuthResponse
-	err = json.Unmarshal(body, &googleAuth)
-
-	if err != nil {
+	if err = json.Unmarshal(body, &googleAuth); err != nil {
 		return googleAuthResponse{}, fmt.Errorf("could not unmarshal JSON from Google's response: %w", err)
 	}
 
@@ -209,7 +208,7 @@ func authHandler(googleClientID string, googleRedirectURI string) func(httpWrite
 	}
 }
 
-func userHandler(repo *db.Repository, jwtSecret string) func(w http.ResponseWriter, r *http.Request) {
+func userHandler(repo *repositories.UserRepository, jwtSecret string) func(w http.ResponseWriter, r *http.Request) {
 	return func(httpWriter http.ResponseWriter, httpRequest *http.Request) {
 		log.Printf("GET /user/ from %v", httpRequest.RemoteAddr)
 		// We can obtain the session token from the requests cookies, which come with every request
@@ -247,24 +246,23 @@ func userHandler(repo *db.Repository, jwtSecret string) func(w http.ResponseWrit
 
 		password := uniuri.NewLen(generatedPasswordLen)
 
-		created, err := repo.CreateUser(claims.Email, password)
-		if err != nil {
-			log.Fatalf("FATAL: fail to create user: %s", err.Error())
+		user, err := repo.UserWithEmail(claims.Email)
+		if !errors.Is(err, repositories.ErrUserNotFound) && err != nil {
+			log.Fatalf("FATAL: fail to query for user: %s", err.Error())
 		}
 
-		if !created {
-			_, err := repo.TouchUser(claims.Email)
-			if err != nil {
-				log.Fatalf("FATAL: Fail to update user: %s", err.Error())
-			}
-
+		if user != nil {
 			_, err = repo.UpdateUserPassword(claims.Email, password)
 			if err != nil {
-				log.Fatalf("FATAL: Fail to update user password: %s", err.Error())
+				log.Fatalf("FATAL: Fail to update user %s: %v", claims.Email, err)
 			}
 			// TODO: Generate HTML output with a "get new password" instead of just sending a new password each time.
 			_, _ = httpWriter.Write([]byte(fmt.Sprintf("Welcome back %s! Your new password is: %s", claims.Email, password)))
 		} else {
+			_, err = repo.CreateUser(claims.Email, password)
+			if err != nil {
+				log.Fatalf("FATAL: Fail to create user %s: %v", claims.Email, err)
+			}
 			// TODO: Generate HTML output
 			_, _ = httpWriter.Write([]byte(fmt.Sprintf("Welcome %s! Your password is: %s", claims.Email, password)))
 		}

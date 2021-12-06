@@ -4,10 +4,12 @@ import (
 	"log"
 	"strings"
 
-	"github.com/p-l/fringe/internal/db"
+	"github.com/jmoiron/sqlx"
 	"github.com/p-l/fringe/internal/http"
 	"github.com/p-l/fringe/internal/radius"
+	"github.com/p-l/fringe/internal/repositories"
 	"github.com/spf13/viper"
+	"modernc.org/ql"
 )
 
 func fatalOnInvalidConfig() {
@@ -35,32 +37,37 @@ func main() {
 
 	// Default values
 	viper.SetDefault("http.root", "http://127.0.0.1:9990/")
-	viper.SetDefault("database.location", "/var/lib/fringe/users.db")
+	viper.SetDefault("database.location", "/var/lib/fringe/users.repositories")
 
 	// Read the configuration
 	if err := viper.ReadInConfig(); err != nil {
-		log.Fatalf("Fatal error config file: %v", err)
+		log.Panicf("Fatal error config file: %v", err)
 	}
 
 	// Validate configuration
 	fatalOnInvalidConfig()
 
-	// Start
-	dbLocation := viper.GetString("database.location")
+	// Initialize Database connexion
+	ql.RegisterDriver()
 
-	repo, err := db.NewRepository(dbLocation)
+	connexion, err := sqlx.Open("ql", viper.GetString("database.location"))
 	if err != nil {
-		log.Fatalf("Could not open or create database at %s: %v", dbLocation, err)
+		log.Panicf("FATAL: Could not connect to database: %v", err)
 	}
-	defer repo.Close()
+	defer func() { _ = connexion.Close() }() //nolint:wsl
+
+	userRepo, err := repositories.NewUserRepository(connexion)
+	if err != nil {
+		log.Panicf("FATAL: Could not initate user reposityr: %v", err)
+	}
 
 	go func() {
-		radius.ServeRadius(repo, viper.GetString("radius.secret"))
+		radius.ServeRadius(userRepo, viper.GetString("radius.secret"))
 	}()
 
 	// HTTP
 	http.ServeHTTP(
-		repo,
+		userRepo,
 		viper.GetString("http.root-url"),
 		viper.GetString("google-oauth.client-id"),
 		viper.GetString("google-oauth.client-secret"),

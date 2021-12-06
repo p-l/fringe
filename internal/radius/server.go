@@ -3,13 +3,13 @@ package radius
 import (
 	"log"
 
-	"github.com/p-l/fringe/internal/db"
+	"github.com/p-l/fringe/internal/repositories"
 	"layeh.com/radius"
 	"layeh.com/radius/rfc2865"
 )
 
 // ServeRadius starts a non-blocking Radius Server.
-func ServeRadius(repo *db.Repository, secret string) {
+func ServeRadius(repo *repositories.UserRepository, secret string) {
 	handler := func(writer radius.ResponseWriter, request *radius.Request) {
 		username := rfc2865.UserName_GetString(request.Packet)
 		password := rfc2865.UserPassword_GetString(request.Packet)
@@ -27,6 +27,9 @@ func ServeRadius(repo *db.Repository, secret string) {
 		}
 
 		if authenticated {
+			if err = repo.TouchUser(username); err != nil {
+				log.Printf("ERR: Could not update user's last seen: %v", err)
+			}
 			code = radius.CodeAccessAccept
 		}
 
