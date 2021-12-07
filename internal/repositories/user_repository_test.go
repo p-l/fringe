@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func dbOpen() (*sqlx.DB, sqlmock.Sqlmock) { //nolint:ireturn
+func dbOpen() (*sqlx.DB, sqlmock.Sqlmock) {
 	mockDB, mockSQL, err := sqlmock.New()
 	if err != nil {
 		log.Panicf("FATAL: an error '%s' was not expected when opening a stub database connection", err)
