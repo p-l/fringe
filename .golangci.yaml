@@ -18,9 +18,32 @@ linters:
   enable-all: true
   disable:
     - exhaustivestruct
+    - golint
+    - interfacer
+    - maligned
     - noctx
+    - scopelint
 
 linters-settings:
+  ireturn:
+    # ireturn allows using `allow` and `reject` settings at the same time.
+    # Both settings are lists of the keywords and regular expressions matched to interface or package names.
+    # keywords:
+    # - `empty` for `interface{}`
+    # - `error` for errors
+    # - `stdlib` for standard library
+    # - `anon` for anonymous interfaces
+
+    # By default, it allows using errors, empty interfaces, anonymous interfaces,
+    # and interfaces provided by the standard library.
+    # You can specify idiomatic endings for interface
+    allow:
+      - anon
+      - error
+      - empty
+      - stdlib
+      - .*Sqlmock
+
   lll:
     # max line length, lines longer will be reported.
     # Note how [Effective Go](https://go.dev/doc/effective_go#formatting) doesn't recommend a fixed maximum:
