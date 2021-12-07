@@ -1,6 +1,6 @@
 {
   "global": {
     "nosec": "enabled",
-    "audit": "enabled"
+    "audit": "disabled"
   }
 }
