@@ -51,10 +51,7 @@ jobs:
         # Path to SARIF file relative to the root of the repository
         sarif_file: results.sarif
 
-    - name: Lint
-      run: make lint
-      
-    - name: Test
+    - name: Run Go Test
       run: make test
 
     - name: Upload Code Coverage
