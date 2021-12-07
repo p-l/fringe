@@ -8,7 +8,7 @@ other services (e.g. 802.1X Wi-Fi, vpn server).
 
 The fringe service offers both a http and radius server. 
 * The web interface allows authenticated users (through Google Oauth) to generate and refresh a randomly generated 
-password (only for users in a pecific email domain). 
+password (only for users in a specific email domain). 
 * The radius server authenticate the user using email and generated password.
 
 ## Getting Started 
