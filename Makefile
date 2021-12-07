@@ -5,11 +5,10 @@ DB_DIR := "db"
 VERSION := $(shell cat VERSION)-$(shell git rev-parse --short HEAD)
 GOOS := $(shell go env GOOS)
 GOARCH := $(shell go env GOARCH)
-GOSEC := $(shell which gosec)
+GOSEC := $(shell go env GOPATH)/bin/gosec
 
 # Packages architecture list
 ARCHITECTURES := 386 amd64 arm arm64
-
 
 .PHONY: all
 all: test build run
