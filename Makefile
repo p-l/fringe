@@ -17,6 +17,7 @@ clean:
 	rm -rf $(BUILD_ARTIFACTS_DIR)
 
 dep:
+	go get -t -v ./...
 	go mod tidy
 	go mod download
 
@@ -27,7 +28,7 @@ lint-fix:
 	golangci-lint run --enable-all --fix
 
 test: lint
-	go test
+	go test -race -coverprofile=coverage.txt -covermode=atomic ./...
 
 build: dep
 	mkdir -p $(BIN_DIR)

@@ -43,3 +43,11 @@ jobs:
       
     - name: Test
       run: make test
+
+    - name: Uploade Code Coverage
+      uses: codecov/codecov-action@v2
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }} # not required for public repos
+        files: ./coverage.txt               # optional
+        fail_ci_if_error: true              # optional (default = false)
+        verbose: true                       # optional (default = false)
