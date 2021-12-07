@@ -36,11 +36,11 @@ lint-fix:
 
 .PHONY: security
 security: gosec-check
-	@[[ -x "$(GOSEC)" ]] && GO111MODULE=on && $(GOSEC) -conf .gosec.json ./...
+	@test -x "$(GOSEC)" && GO111MODULE=on && $(GOSEC) -conf .gosec.json ./...
 
 .PHONY: gosec-check
 gosec-check:
-	@[[ -x "$(GOSEC)" ]] || echo "gosec is required: go install github.com/securego/gosec/v2/cmd/gosec@latest"
+	@test -x "$(GOSEC)" || echo "gosec is required: go install github.com/securego/gosec/v2/cmd/gosec@latest"
 
 .PHONY: test
 test: lint
