@@ -19,6 +19,9 @@ artifacts/
 *.test
 /coverage.txt
 
+# Security test output
+/results.sarif
+
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
