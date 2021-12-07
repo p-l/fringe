@@ -1,4 +1,5 @@
 # Fringe
+[![codecov](https://codecov.io/gh/p-l/fringe/branch/main/graph/badge.svg?token=A23DESO0EP)](https://codecov.io/gh/p-l/fringe)
 
 **Fringe** is an easy workaround for Google Workplace users who need a Radius server to perform authentication on behalf of
 other services (e.g. 802.1X Wi-Fi, vpn server). 
