@@ -75,17 +75,12 @@ func fetchGoogleTokenFromCallbackCode(code string, googleClientID string, google
 	postParams.Add("redirect_uri", googleRedirectURI)
 	postParams.Add("grant_type", "authorization_code")
 
-	resp, err := http.PostForm("https://oauth2.googleapis.com/token", postParams) //nolint:bodyclose
+	resp, err := http.PostForm("https://oauth2.googleapis.com/token", postParams)
 	if err != nil {
 		return googleAuthResponse{}, fmt.Errorf("could not create request to google token api: %w", err)
 	}
 
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			log.Printf("ERR: failed to read response body: %s", err.Error())
-		}
-	}(resp.Body)
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
@@ -110,17 +105,12 @@ func fetchGoogleUserInfoWithToken(tokenType string, token string) (userInfo goog
 
 	req.Header.Add("Authorization", fmt.Sprintf("%s %s", tokenType, token))
 
-	userInfoResponse, err := http.DefaultClient.Do(req) //nolint:bodyclose
+	userInfoResponse, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return googleUserInfoResponse{}, fmt.Errorf("could not read response from user info: %w", err)
 	}
 
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			log.Printf("ERR: Could not close openid userinfo response: %v", err)
-		}
-	}(userInfoResponse.Body)
+	defer func() { _ = userInfoResponse.Body.Close() }()
 
 	userInfoBody, err := ioutil.ReadAll(userInfoResponse.Body)
 	if err != nil {
@@ -256,14 +246,12 @@ func userHandler(repo *repositories.UserRepository, jwtSecret string) func(w htt
 			if err != nil {
 				log.Fatalf("FATAL: Fail to update user %s: %v", claims.Email, err)
 			}
-			// TODO: Generate HTML output with a "get new password" instead of just sending a new password each time.
 			_, _ = httpWriter.Write([]byte(fmt.Sprintf("Welcome back %s! Your new password is: %s", claims.Email, password)))
 		} else {
 			_, err = repo.CreateUser(claims.Email, password)
 			if err != nil {
 				log.Fatalf("FATAL: Fail to create user %s: %v", claims.Email, err)
 			}
-			// TODO: Generate HTML output
 			_, _ = httpWriter.Write([]byte(fmt.Sprintf("Welcome %s! Your password is: %s", claims.Email, password)))
 		}
 	}
