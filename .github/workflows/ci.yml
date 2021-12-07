@@ -44,7 +44,7 @@ jobs:
     - name: Test
       run: make test
 
-    - name: Uploade Code Coverage
+    - name: Upload Code Coverage
       uses: codecov/codecov-action@v2
       with:
         token: ${{ secrets.CODECOV_TOKEN }} # not required for public repos
