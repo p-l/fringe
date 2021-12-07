@@ -17,9 +17,13 @@ clean:
 	rm -rf $(BUILD_ARTIFACTS_DIR)
 
 dep:
+	go mod tidy
 	go mod download
 
 lint:
+	golangci-lint run --enable-all
+
+lint-fix:
 	golangci-lint run --enable-all --fix
 
 test: lint
@@ -27,12 +31,12 @@ test: lint
 
 build: dep
 	mkdir -p $(BIN_DIR)
-	go build -ldflags "-X main.Version=$(VERSION)" -o $(BIN_DIR)/$(BIN_FILE)-${GOOS}-${GOARCH}
+	go build -ldflags "-X main.Version=$(VERSION)" -o $(BIN_DIR)/$(BIN_FILE)-$(GOOS)-$(GOARCH)
 
 .PHONY: run
 run: build
 	mkdir -p $(DB_DIR)
-	$(BIN_DIR)/$(BIN_FILE)
+	$(BIN_DIR)/$(BIN_FILE)-$(GOOS)-$(GOARCH)
 
 .PHONY: version
 version:
