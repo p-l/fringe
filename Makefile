@@ -35,16 +35,13 @@ lint:
 lint-fix:
 	golangci-lint run --enable-all --fix
 
+.PHONY: security
+security: gosec-check
+	@[[ -x "$(GOSEC)" ]] && GO111MODULE=on && $(GOSEC) -conf .gosec.json ./...
 
-security:
-ifneq ("$(wildcard $(GOSEC))","")
-	GO111MODULE=on && $(GOSEC) -conf .gosec.json ./...
-else
-  	@echo "gosec is required for this target"
-  	@echo "run: go install github.com/securego/gosec/v2/cmd/gosec@latest"
-  	@echo " "
-  	@echo "visit https://github.com/securego/gosec for details"
-endif
+.PHONY: gosec-check
+gosec-check:
+	@[[ -x "$(GOSEC)" ]] || echo "gosec is required: go install github.com/securego/gosec/v2/cmd/gosec@latest"
 
 .PHONY: test
 test: lint
