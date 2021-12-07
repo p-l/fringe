@@ -28,7 +28,7 @@ dep:
 	go mod download
 
 .PHONY: lint
-lint:
+lint: security
 	golangci-lint run --enable-all
 
 .PHONY: lint-fix
