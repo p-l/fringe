@@ -5,31 +5,48 @@ DB_DIR := "db"
 VERSION := $(shell cat VERSION)-$(shell git rev-parse --short HEAD)
 GOOS := $(shell go env GOOS)
 GOARCH := $(shell go env GOARCH)
+GOSEC := $(shell go env GOPATH)/bin/gosec
 
+# Packages architecture list
+ARCHITECTURES := 386 amd64 arm arm64
 
 .PHONY: all
-all: test build run
+all: security lint test build
 
+.PHONY: clean
 clean:
 	go clean
 	rm -rf $(BIN_DIR)/*
 	rm -rf $(DB_DIR)/*
 	rm -rf $(BUILD_ARTIFACTS_DIR)
 
+.PHONY: dep
 dep:
 	go get -t -v ./...
 	go mod tidy
 	go mod download
 
+.PHONY: lint
 lint:
 	golangci-lint run --enable-all
 
+.PHONY: lint-fix
 lint-fix:
 	golangci-lint run --enable-all --fix
 
+.PHONY: security
+security: gosec-check
+	@test -x "$(GOSEC)" && GO111MODULE=on && $(GOSEC) -conf .gosec.json ./...
+
+.PHONY: gosec-check
+gosec-check:
+	@test -x "$(GOSEC)" || echo "gosec is required: go install github.com/securego/gosec/v2/cmd/gosec@latest"
+
+.PHONY: test
 test: lint
 	go test -race -coverprofile=coverage.txt -covermode=atomic ./...
 
+.PHONY: build
 build: dep
 	mkdir -p $(BIN_DIR)
 	go build -ldflags "-X main.Version=$(VERSION)" -o $(BIN_DIR)/$(BIN_FILE)-$(GOOS)-$(GOARCH)
@@ -43,7 +60,6 @@ run: build
 version:
 	@echo "$(VERSION)"
 
-ARCHITECTURES := 386 amd64 arm arm64
 .PHONY: packages
 packages:
 	mkdir -p $(BUILD_ARTIFACTS_DIR)
