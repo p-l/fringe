@@ -11,7 +11,7 @@ GOSEC := $(shell go env GOPATH)/bin/gosec
 ARCHITECTURES := 386 amd64 arm arm64
 
 .PHONY: all
-all: test build run
+all: security lint test build
 
 .PHONY: clean
 clean:
@@ -27,7 +27,7 @@ dep:
 	go mod download
 
 .PHONY: lint
-lint: security
+lint:
 	golangci-lint run --enable-all
 
 .PHONY: lint-fix
