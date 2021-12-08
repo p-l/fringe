@@ -3,13 +3,13 @@ package radius
 import (
 	"log"
 
-	"github.com/p-l/fringe/internal/repositories"
+	"github.com/p-l/fringe/internal/repos"
 	"layeh.com/radius"
 	"layeh.com/radius/rfc2865"
 )
 
 // ServeRadius starts a non-blocking Radius Server.
-func ServeRadius(repo *repositories.UserRepository, secret string) {
+func ServeRadius(repo *repos.UserRepository, secret string) {
 	handler := func(writer radius.ResponseWriter, request *radius.Request) {
 		username := rfc2865.UserName_GetString(request.Packet)
 		password := rfc2865.UserPassword_GetString(request.Packet)

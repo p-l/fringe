@@ -1,4 +1,4 @@
-package repositories_test
+package repos_test
 
 import (
 	"log"
@@ -8,7 +8,7 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/jaswdr/faker"
 	"github.com/jmoiron/sqlx"
-	"github.com/p-l/fringe/internal/repositories"
+	"github.com/p-l/fringe/internal/repos"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -41,7 +41,7 @@ func TestShouldReturnNewUserWhenCreating(t *testing.T) {
 	mockSQL.ExpectExec("").WillReturnResult(sqlmock.NewResult(1, 1))
 	mockSQL.ExpectCommit()
 
-	userRepo, _ := repositories.NewUserRepository(db)
+	userRepo, _ := repos.NewUserRepository(db)
 	fake := faker.New()
 
 	email := fake.Internet().Email()
@@ -77,7 +77,7 @@ func TestUpdateOnlyLastSeenWhenCreatingExistingUser(t *testing.T) {
 	fake := faker.New()
 	email := fake.Internet().Email()
 	password := fake.Internet().Password()
-	passwordHash, _ := repositories.CreatePasswordHash(password)
+	passwordHash, _ := repos.CreatePasswordHash(password)
 	createdAt := fake.Time().Unix(time.Now())
 	updatedAt := fake.Time().Unix(time.Now())
 	lastSeenAt := fake.Time().Unix(time.Now())
@@ -88,10 +88,10 @@ func TestUpdateOnlyLastSeenWhenCreatingExistingUser(t *testing.T) {
 	mockSQL.ExpectQuery("SELECT").WillReturnRows(
 		sqlmock.NewRows([]string{"email", "password", "created_at", "updated_at", "last_seen_at"}).AddRow(email, passwordHash, createdAt, updatedAt, lastSeenAt))
 
-	userRepo, _ := repositories.NewUserRepository(db)
+	userRepo, _ := repos.NewUserRepository(db)
 
 	user, err := userRepo.CreateUser(email, newPassword)
-	assert.ErrorIs(t, err, repositories.ErrUserAlreadyExist)
+	assert.ErrorIs(t, err, repos.ErrUserAlreadyExist)
 
 	// CreatUser will return the existing user without modifying it
 	assert.NotNil(t, user)
@@ -120,7 +120,7 @@ func TestUserWithEmailReturnsUnmodifiedUserWhenFound(t *testing.T) {
 	fake := faker.New()
 	email := fake.Internet().Email()
 	password := fake.Internet().Password()
-	passwordHash, _ := repositories.CreatePasswordHash(password)
+	passwordHash, _ := repos.CreatePasswordHash(password)
 	createdAt := fake.Time().Unix(time.Now())
 	updatedAt := fake.Time().Unix(time.Now())
 	lastSeenAt := fake.Time().Unix(time.Now())
@@ -129,7 +129,7 @@ func TestUserWithEmailReturnsUnmodifiedUserWhenFound(t *testing.T) {
 	mockSQL.ExpectQuery("SELECT").WillReturnRows(
 		sqlmock.NewRows([]string{"email", "password", "created_at", "updated_at", "last_seen_at"}).AddRow(email, passwordHash, createdAt, updatedAt, lastSeenAt))
 
-	userRepo, _ := repositories.NewUserRepository(db)
+	userRepo, _ := repos.NewUserRepository(db)
 
 	user, err := userRepo.UserWithEmail(email)
 	assert.Nil(t, err)
@@ -161,10 +161,10 @@ func TestUserWithEmailReturnsErrorWhenUserNotFound(t *testing.T) {
 	// Return the fake User
 	mockSQL.ExpectQuery("SELECT").WillReturnRows(sqlmock.NewRows([]string{"email", "password", "created_at", "updated_at", "last_seen_at"}))
 
-	userRepo, _ := repositories.NewUserRepository(db)
+	userRepo, _ := repos.NewUserRepository(db)
 
 	user, err := userRepo.UserWithEmail(email)
-	assert.ErrorIs(t, err, repositories.ErrUserNotFound)
+	assert.ErrorIs(t, err, repos.ErrUserNotFound)
 	assert.Nil(t, user)
 
 	// we make sure that all expectations were met
@@ -188,7 +188,7 @@ func TestUpdateUserPasswordFailsWithUnknownUser(t *testing.T) {
 	mockSQL.ExpectExec("").WillReturnResult(sqlmock.NewResult(0, 0))
 	mockSQL.ExpectCommit()
 
-	userRepo, _ := repositories.NewUserRepository(db)
+	userRepo, _ := repos.NewUserRepository(db)
 
 	success, err := userRepo.UpdateUserPassword(email, newPassword)
 	assert.Nil(t, err)
@@ -216,7 +216,7 @@ func TestUpdateUserPasswordUpdatesKnownUser(t *testing.T) {
 	mockSQL.ExpectExec("").WillReturnResult(sqlmock.NewResult(0, 1))
 	mockSQL.ExpectCommit()
 
-	userRepo, _ := repositories.NewUserRepository(db)
+	userRepo, _ := repos.NewUserRepository(db)
 
 	success, err := userRepo.UpdateUserPassword(email, newPassword)
 	assert.Nil(t, err)
@@ -242,11 +242,11 @@ func TestTouchUserFailsWithUnknownUser(t *testing.T) {
 	mockSQL.ExpectExec("").WillReturnResult(sqlmock.NewResult(0, 0))
 	mockSQL.ExpectCommit()
 
-	userRepo, _ := repositories.NewUserRepository(db)
+	userRepo, _ := repos.NewUserRepository(db)
 
 	err := userRepo.TouchUser(email)
 	assert.NotNil(t, err)
-	assert.ErrorIs(t, err, repositories.ErrUserNotFound)
+	assert.ErrorIs(t, err, repos.ErrUserNotFound)
 
 	// we make sure that all expectations were met
 	if err := mockSQL.ExpectationsWereMet(); err != nil {
@@ -269,7 +269,7 @@ func TestTouchUserUpdatesOnlyKnownUser(t *testing.T) {
 	mockSQL.ExpectExec("").WillReturnResult(sqlmock.NewResult(0, 1))
 	mockSQL.ExpectCommit()
 
-	userRepo, _ := repositories.NewUserRepository(db)
+	userRepo, _ := repos.NewUserRepository(db)
 
 	err := userRepo.TouchUser(email)
 	assert.Nil(t, err)
@@ -293,10 +293,10 @@ func TestAuthenticateReturnsUserNotFoundWhenNotFound(t *testing.T) {
 	// Return the fake User
 	mockSQL.ExpectQuery("SELECT").WillReturnRows(sqlmock.NewRows([]string{"email", "password", "created_at", "updated_at", "last_seen_at"}))
 
-	userRepo, _ := repositories.NewUserRepository(db)
+	userRepo, _ := repos.NewUserRepository(db)
 
 	success, err := userRepo.AuthenticateUser(email, password)
-	assert.ErrorIs(t, err, repositories.ErrUserNotFound)
+	assert.ErrorIs(t, err, repos.ErrUserNotFound)
 	assert.False(t, success)
 
 	// we make sure that all expectations were met
@@ -314,7 +314,7 @@ func TestAuthenticateUserWithHAshWhenUserExists(t *testing.T) {
 	fake := faker.New()
 	email := fake.Internet().Email()
 	password := fake.Internet().Password()
-	passwordHash, _ := repositories.CreatePasswordHash(password)
+	passwordHash, _ := repos.CreatePasswordHash(password)
 	createdAt := fake.Time().Unix(time.Now())
 	updatedAt := fake.Time().Unix(time.Now())
 	lastSeenAt := fake.Time().Unix(time.Now())
@@ -323,7 +323,7 @@ func TestAuthenticateUserWithHAshWhenUserExists(t *testing.T) {
 	mockSQL.ExpectQuery("SELECT").WillReturnRows(
 		sqlmock.NewRows([]string{"email", "password", "created_at", "updated_at", "last_seen_at"}).AddRow(email, passwordHash, createdAt, updatedAt, lastSeenAt))
 
-	userRepo, _ := repositories.NewUserRepository(db)
+	userRepo, _ := repos.NewUserRepository(db)
 
 	success, err := userRepo.AuthenticateUser(email, password)
 	assert.Nil(t, err)

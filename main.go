@@ -7,7 +7,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/p-l/fringe/internal/http"
 	"github.com/p-l/fringe/internal/radius"
-	"github.com/p-l/fringe/internal/repositories"
+	"github.com/p-l/fringe/internal/repos"
 	"github.com/spf13/viper"
 	"modernc.org/ql"
 )
@@ -37,7 +37,7 @@ func main() {
 
 	// Default values
 	viper.SetDefault("http.root", "http://127.0.0.1:9990/")
-	viper.SetDefault("database.location", "/var/lib/fringe/users.repositories")
+	viper.SetDefault("database.location", "/var/lib/fringe/users.repos")
 
 	// Read the configuration
 	if err := viper.ReadInConfig(); err != nil {
@@ -56,7 +56,7 @@ func main() {
 	}
 	defer func() { _ = connexion.Close() }() //nolint:wsl
 
-	userRepo, err := repositories.NewUserRepository(connexion)
+	userRepo, err := repos.NewUserRepository(connexion)
 	if err != nil {
 		log.Panicf("FATAL: Could not initate user reposityr: %v", err)
 	}
