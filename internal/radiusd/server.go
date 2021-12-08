@@ -1,4 +1,4 @@
-package radius
+package radiusd
 
 import (
 	"log"
@@ -8,8 +8,8 @@ import (
 	"layeh.com/radius/rfc2865"
 )
 
-// ServeRadius starts a non-blocking Radius Server.
-func ServeRadius(repo *repos.UserRepository, secret string) {
+// NewRadiusServer Creates and configure the Radius Server.
+func NewRadiusServer(repo *repos.UserRepository, secret string) *radius.PacketServer {
 	handler := func(writer radius.ResponseWriter, request *radius.Request) {
 		username := rfc2865.UserName_GetString(request.Packet)
 		password := rfc2865.UserPassword_GetString(request.Packet)
@@ -18,7 +18,7 @@ func ServeRadius(repo *repos.UserRepository, secret string) {
 		log.Printf("Radius request for %s from %v", username, request.RemoteAddr)
 
 		if len(password) == 0 {
-			log.Printf("WARN: No password provided in radius request from: %v", request.RemoteAddr)
+			log.Printf("WARN: No password provided in radiusd request from: %v", request.RemoteAddr)
 		}
 
 		authenticated, err := repo.AuthenticateUser(username, password)
@@ -41,14 +41,12 @@ func ServeRadius(repo *repos.UserRepository, secret string) {
 		}
 	}
 
+	log.Printf("Created radius server on :1812")
 	server := radius.PacketServer{
+		Addr:         ":1812",
 		Handler:      radius.HandlerFunc(handler),
 		SecretSource: radius.StaticSecretSource([]byte(secret)),
 	}
 
-	log.Printf("Starting radius server on :1812")
-
-	if err := server.ListenAndServe(); err != nil {
-		log.Fatal(err)
-	}
+	return &server
 }

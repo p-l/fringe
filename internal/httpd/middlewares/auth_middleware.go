@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/p-l/fringe/internal/http/helpers"
+	"github.com/p-l/fringe/internal/httpd/helpers"
 )
 
 type AuthMiddleware struct {

@@ -1,14 +1,15 @@
-package http
+package httpd
 
 import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/p-l/fringe/internal/http/handlers"
-	"github.com/p-l/fringe/internal/http/helpers"
-	"github.com/p-l/fringe/internal/http/middlewares"
+	"github.com/p-l/fringe/internal/httpd/handlers"
+	"github.com/p-l/fringe/internal/httpd/helpers"
+	"github.com/p-l/fringe/internal/httpd/middlewares"
 	"github.com/p-l/fringe/internal/repos"
 )
 
@@ -18,7 +19,7 @@ import (
 //)
 
 // ServeHTTP Starts blocking HTTP server.
-func ServeHTTP(repo *repos.UserRepository, rootURL string, googleClientID string, googleClientSecret string, allowedDomain string, jwtSecret string) {
+func NewHTTPServer(repo *repos.UserRepository, rootURL string, googleClientID string, googleClientSecret string, allowedDomain string, jwtSecret string) *http.Server {
 	googleOAuthConfig := handlers.GoogleOAuthClientConfig{
 		ID:          googleClientID,
 		Secret:      googleClientSecret,
@@ -49,10 +50,14 @@ func ServeHTTP(repo *repos.UserRepository, rootURL string, googleClientID string
 	router.PathPrefix("/assets/").Handler(http.StripPrefix("/assets/", http.FileServer(http.Dir("./assets/"))))
 	http.Handle("/", router)
 
-	log.Printf("Starting http server on :9990")
-
-	err := http.ListenAndServe(":9990", router)
-	if err != nil {
-		log.Fatalf("FATAL: %v", err)
+	log.Printf("Created httpd server on :9990")
+	httpd := http.Server{
+		Handler:      router,
+		Addr:         ":9990",
+		WriteTimeout: 5 * time.Second,
+		ReadTimeout:  5 * time.Second,
+		IdleTimeout:  5 * time.Second,
 	}
+
+	return &httpd
 }
