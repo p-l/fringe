@@ -1,0 +1,28 @@
+{{ define "base" }}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+    <meta charset="UTF-8"/>
+    <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport"/>
+    <meta content="ie=edge" http-equiv="x-ua-compatible"/>
+
+    <link type="text/css" rel="stylesheet" href="/assets/style/main.css">
+
+    <title>{{ template "title" . }}</title>
+
+    {{ template "head" . }}
+
+</head>
+<body>
+
+{{ template "content" . }}
+
+    <!-- example icon -->
+
+</body>
+<!-- Load Feather Icons (more info: https://github.com/feathericons/feather) -->
+<script src="https://unpkg.com/feather-icons"></script>
+<script>feather.replace()</script>
+</html>
+{{ end }}

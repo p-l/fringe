@@ -2,21 +2,41 @@ package main
 
 import (
 	"context"
-	"github.com/jmoiron/sqlx"
-	"github.com/p-l/fringe/internal/httpd"
-	"github.com/p-l/fringe/internal/radiusd"
-	"github.com/p-l/fringe/internal/repos"
-	"github.com/spf13/viper"
-	"layeh.com/radius"
+	"io/fs"
 	"log"
-	"modernc.org/ql"
 	"net/http"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/jmoiron/sqlx"
+	"github.com/p-l/fringe/assets"
+	"github.com/p-l/fringe/internal/httpd"
+	"github.com/p-l/fringe/internal/radiusd"
+	"github.com/p-l/fringe/internal/repos"
+	"github.com/p-l/fringe/templates"
+	"github.com/spf13/viper"
+	"layeh.com/radius"
+	"modernc.org/ql"
 )
+
+func loadConfigFile() {
+	viper.SetConfigName("config")       // name of config file (without extension)
+	viper.SetConfigType("toml")         // REQUIRED if the config file does not have the extension in the name
+	viper.AddConfigPath("/etc/fringe/") // path to look for the config file in
+	viper.AddConfigPath(".")            // optionally look for config in the working directory
+
+	// Default values
+	viper.SetDefault("http.root", "http://127.0.0.1:9990/")
+	viper.SetDefault("database.location", "/var/lib/fringe/users.repos")
+
+	// Read the configuration
+	if err := viper.ReadInConfig(); err != nil {
+		log.Panicf("Fatal error config file: %v", err)
+	}
+}
 
 func fatalOnInvalidConfig() {
 	criticalKeys := []string{
@@ -35,24 +55,19 @@ func fatalOnInvalidConfig() {
 	}
 }
 
-const terminationWait = time.Duration(time.Second * 5)
+func httpSrvTextsFromConfig() httpd.Texts {
+	return httpd.Texts{
+		PasswordHint:          viper.GetString("texts.password.hint"),
+		PasswordInfoCardTitle: viper.GetString("texts.password.info-title"),
+		PasswordInfoCardItems: viper.GetStringSlice("texts.password.info-items"),
+	}
+}
+
+const terminationWait = time.Second * 5
 
 func main() {
-	viper.SetConfigName("config")       // name of config file (without extension)
-	viper.SetConfigType("toml")         // REQUIRED if the config file does not have the extension in the name
-	viper.AddConfigPath("/etc/fringe/") // path to look for the config file in
-	viper.AddConfigPath(".")            // optionally look for config in the working directory
-
-	// Default values
-	viper.SetDefault("http.root", "http://127.0.0.1:9990/")
-	viper.SetDefault("database.location", "/var/lib/fringe/users.repos")
-
-	// Read the configuration
-	if err := viper.ReadInConfig(); err != nil {
-		log.Panicf("Fatal error config file: %v", err)
-	}
-
-	// Validate configuration
+	// Load and validate configuration
+	loadConfigFile()
 	fatalOnInvalidConfig()
 
 	// Initialize Database connexion
@@ -70,20 +85,29 @@ func main() {
 
 	// Get Radius Started
 	radiusSrv := radiusd.NewRadiusServer(userRepo, viper.GetString("radius.secret"))
+
 	go func() {
 		if err := radiusSrv.ListenAndServe(); err != nil {
 			log.Println(err)
 		}
 	}()
 
+	staticTemplates := fs.FS(templates.Files())
+	staticAssets := fs.FS(assets.Files())
+	httpSrvTexts := httpSrvTextsFromConfig()
+
 	// HTTP
 	httpSrv := httpd.NewHTTPServer(
 		userRepo,
+		staticTemplates,
+		staticAssets,
 		viper.GetString("http.root-url"),
 		viper.GetString("google-oauth.client-id"),
 		viper.GetString("google-oauth.client-secret"),
 		viper.GetString("fringe.allowed-domain"),
-		viper.GetString("fringe.secret"))
+		viper.GetString("fringe.secret"),
+		httpSrvTexts)
+
 	go func() {
 		if err := httpSrv.ListenAndServe(); err != nil {
 			log.Println(err)
@@ -115,5 +139,5 @@ func waitOn(httpSrv *http.Server, radiusSrv *radius.PacketServer, connexion *sql
 	// <-ctx.Done() if your application should wait for other services
 	// to finalize based on context cancellation.
 	log.Println("shutting down")
-	os.Exit(0)
+	os.Exit(0) //nolint:gocritic
 }

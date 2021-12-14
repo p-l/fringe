@@ -1,0 +1,166 @@
+body {
+    margin: 0;
+    background: white;
+    font-family: "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";;
+}
+
+.center-containers {
+    align-items: center;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    width: 100%;
+    top: 50%;
+    position: fixed;
+    left: 50%;
+    /* bring your own prefixes */
+    transform: translate(-50%, -50%);
+}
+
+.card {
+    width: 410px;
+    margin: 10px 5px;
+    padding: 15px 10px;
+}
+
+.info-card {
+    width: 390px;
+    background-color: white;
+    border-radius: 6px;
+    border: 1px solid #dadce0;
+}
+
+@media (max-width: 440px) {
+    .card {
+        width: calc(100% - 20px);
+        margin: 10px 5px;
+        padding: 15px 10px;
+    }
+
+    .info-card {
+        width: calc(100% - 40px);
+    }
+}
+
+.card .line {
+    display: flex;
+    align-items: stretch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+    white-space: nowrap;
+    word-wrap: break-word;
+}
+
+.card .line h3 {
+    padding: 0;
+    margin: 0;
+}
+
+/* Add some margins for each label */
+.password-card label {
+    color: dimgrey;
+    font-size: 12px;
+    font-weight: lighter;
+    margin: 0;
+}
+
+/* Style the input fields */
+.password-card input {
+    float: left;
+    background-color: whitesmoke;
+    border: 1px solid lightgrey;
+    border-radius: 6px 0 0 6px;
+    box-shadow: 0 0 0 0 black;
+    box-sizing: border-box;
+    color: black;
+    flex-grow: 100;
+    font-family: monospace;
+    font-size: 16px;
+    height: 43px;
+    margin: 0;
+    padding: 3px 12px;
+    vertical-align: middle;
+}
+
+.password-card input:focus {
+    outline: none;
+}
+
+.password-card button {
+    background-color: dodgerblue;
+    border: 1px solid dodgerblue;
+    box-shadow: 0 0 0 0 black;
+    box-sizing: border-box;
+    color: white;
+    float: none;
+    font-size: 14px;
+    height: 43px;
+        margin: 0;
+    padding: 6px 3px;
+    text-align: center;
+    vertical-align: middle;
+}
+
+.password-card .copy-button {
+    border-radius: 0 6px 6px 0;
+    width: 50px;
+    padding: 6px 6px 3px;
+}
+
+.password-card .new-button {
+    border-radius: 6px;
+    width: 100%;
+}
+
+@media (hover: hover) {
+    button:hover {
+        background-color: royalblue;
+        border: 1px solid royalblue;
+    }
+
+    .password-card .copied-state:hover {
+        background-color: seagreen;
+        border: 1px solid seagreen;
+    }
+}
+
+.password-card .copied-state {
+    background-color: seagreen;
+    border: 1px solid seagreen;
+}
+
+.info-card .line {
+    margin: 0;
+    padding: 0;
+}
+
+.info-card .title {
+    border-top-right-radius: 5px;
+    border-top-left-radius: 5px;
+}
+
+.info-card .line h4 {
+    color: black;
+    font-weight: 400;
+    letter-spacing: 0.015em;
+    line-height: 1.5em;
+    padding-bottom: 6px;
+    font-size: 11pt;
+    margin: 0;
+}
+
+.info-card .line ul {
+    padding: 0;
+    margin: 0;
+    font-weight: lighter;
+    font-size: 10pt;
+    color: black;
+    list-style: none inside none;
+}
+
+.info-card .line ul li {
+    font-size: 10pt;
+
+}
+

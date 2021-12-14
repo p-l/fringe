@@ -43,7 +43,7 @@ func NewRadiusServer(repo *repos.UserRepository, secret string) *radius.PacketSe
 
 	log.Printf("Created radius server on :1812")
 	server := radius.PacketServer{
-		Addr:         ":1812",
+		Addr:         "127.0.0.1:1812",
 		Handler:      radius.HandlerFunc(handler),
 		SecretSource: radius.StaticSecretSource([]byte(secret)),
 	}
