@@ -56,6 +56,13 @@ run: build
 	mkdir -p $(DB_DIR)
 	$(BIN_DIR)/$(BIN_FILE)-$(GOOS)-$(GOARCH)
 
+.PHONY: run-air
+run-air:
+	mkdir -p $(DB_DIR)
+	mkdir -p $(BIN_DIR)
+	@echo "Running air (https://github.com/cosmtrek/air)"
+	air
+
 .PHONY: version
 version:
 	@echo "$(VERSION)"
