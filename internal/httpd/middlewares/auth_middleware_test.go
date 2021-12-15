@@ -76,7 +76,7 @@ func TestEnsureAuth(t *testing.T) {
 		authMiddleware := middlewares.NewAuthMiddleware("/auth", []string{"/no-auth"}, authHelper)
 
 		validClaims := helpers.NewAuthClaims(fake.Internet().Email())
-		// Force expiry to be 1 minute ago
+		// Force expiry to be 1 minute in the future
 		validClaims.StandardClaims.ExpiresAt = time.Now().Add(1 * time.Minute).Unix()
 		validTokenCookie := authHelper.NewJWTCookieFromClaims(validClaims)
 
