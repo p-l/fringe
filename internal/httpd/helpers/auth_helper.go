@@ -27,7 +27,7 @@ func (h *AuthHelper) NewJWTCookieFromClaims(claims *AuthClaims) *http.Cookie {
 
 	tokenString, err := token.SignedString(jwtKey)
 	if err != nil {
-		log.Printf("!!! Error creating JWT Cookie")
+		log.Fatalf("!!! Error creating JWT signed string: %v", err)
 	}
 
 	return &http.Cookie{
