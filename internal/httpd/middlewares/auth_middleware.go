@@ -49,7 +49,7 @@ func (a *AuthMiddleware) EnsureAuth(next http.Handler) http.Handler {
 			log.Printf("Auth [src:%v] %v ", httpRequest.RemoteAddr, err)
 
 			http.SetCookie(httpResponse, a.authHelper.RemoveJWTCookie())
-			http.Error(httpResponse, "invalid JWT received in cookies", http.StatusBadRequest)
+			http.Redirect(httpResponse, httpRequest, a.AuthPath, http.StatusFound)
 
 			return
 		}
