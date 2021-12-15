@@ -24,6 +24,14 @@ linters:
     - noctx
     - scopelint
 
+issues:
+   exclude-rules:
+     - path: _test\.go
+       linters:
+         - funlen
+         - bodyclose
+         - gosec
+
 linters-settings:
   ireturn:
     # ireturn allows using `allow` and `reject` settings at the same time.
