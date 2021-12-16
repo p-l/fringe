@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -35,14 +34,14 @@ func (a *AuthHandler) GoogleCallbackHandler(httpResponse http.ResponseWriter, ht
 	googleUserInfo, err := a.googleOAuth.AuthenticateUserWithCode(httpRequest.Context(), code)
 	if err != nil {
 		log.Printf("Auth [src:%v] invalid token %v", httpRequest.RemoteAddr, err)
-		http.Error(httpResponse, "Unable to confirm user info", http.StatusUnauthorized)
+		http.Error(httpResponse, "Unable to validate code", http.StatusUnauthorized)
 
 		return
 	}
 
 	if !strings.Contains(googleUserInfo.Email, "@"+a.allowedDomain) {
 		log.Printf("Auth [src:%v] email (%s) is not in allowed domain (%s)", httpRequest.RemoteAddr, googleUserInfo.Email, a.allowedDomain)
-		http.Error(httpResponse, fmt.Sprintf("User not in allowed domain %s", a.allowedDomain), http.StatusUnauthorized)
+		http.Error(httpResponse, "Domain is not allowed", http.StatusUnauthorized)
 
 		return
 	}
