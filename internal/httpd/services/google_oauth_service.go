@@ -15,7 +15,7 @@ import (
 type GoogleOAuthService struct {
 	ClientID          string
 	ClientSecret      string
-	ClientRedirectURL string
+	ClientCallbackURL string
 	httpClient        *http.Client
 }
 
@@ -34,12 +34,12 @@ type GoogleUserInfo struct {
 
 var ErrGoogleAuthenticationFailed = errors.New("invalid response from google API")
 
-func NewGoogleOAuthService(client *http.Client, clientID string, clientSecret string, clientRedirectURL string) *GoogleOAuthService {
+func NewGoogleOAuthService(httpClient *http.Client, clientID string, clientSecret string, clientCallbackURL string) *GoogleOAuthService {
 	return &GoogleOAuthService{
 		ClientID:          clientID,
 		ClientSecret:      clientSecret,
-		ClientRedirectURL: clientRedirectURL,
-		httpClient:        client,
+		ClientCallbackURL: clientCallbackURL,
+		httpClient:        httpClient,
 	}
 }
 
@@ -54,7 +54,7 @@ func (g *GoogleOAuthService) fetchGoogleTokenFromCallbackCode(ctx context.Contex
 	postParams.Add("code", code)
 	postParams.Add("client_id", g.ClientID)
 	postParams.Add("client_secret", g.ClientSecret)
-	postParams.Add("redirect_uri", g.ClientRedirectURL)
+	postParams.Add("redirect_uri", g.ClientCallbackURL)
 	postParams.Add("grant_type", "authorization_code")
 
 	postBody := strings.NewReader(postParams.Encode())
@@ -148,7 +148,7 @@ func (g *GoogleOAuthService) RedirectURL() string {
 	googleAuthURL := fmt.Sprintf(
 		"https://accounts.google.com/o/oauth2/v2/auth?client_id=%s&redirect_uri=%s&response_type=code&scope=%s",
 		url.QueryEscape(g.ClientID),
-		url.QueryEscape(g.ClientRedirectURL),
+		url.QueryEscape(g.ClientCallbackURL),
 		url.QueryEscape(googleAuthScope))
 
 	return googleAuthURL

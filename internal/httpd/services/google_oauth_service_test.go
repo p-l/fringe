@@ -3,6 +3,7 @@ package services_test
 import (
 	"bytes"
 	"context"
+	"github.com/p-l/fringe/internal/mocks"
 	"io/ioutil"
 	"net/http"
 	"testing"
@@ -13,26 +14,13 @@ import (
 
 const googleTokenAPIURL = "https://oauth2.googleapis.com/token"
 
-// Mock HTTP.Client.
-type RoundTripFunc func(req *http.Request) *http.Response
-
-func (f RoundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
-	return f(req), nil
-}
-
-func NewMockHTTPClient(fn RoundTripFunc) *http.Client {
-	return &http.Client{
-		Transport: fn,
-	}
-}
-
 func TestGoogleOAuthService_AuthenticateUserWithCode(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Refuse authentication when token call fails", func(t *testing.T) {
 		t.Parallel()
 
-		client := NewMockHTTPClient(func(req *http.Request) *http.Response {
+		client := mocks.NewMockHTTPClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: http.StatusTeapot,
 				Body:       ioutil.NopCloser(bytes.NewBufferString(`{}`)),
@@ -50,7 +38,7 @@ func TestGoogleOAuthService_AuthenticateUserWithCode(t *testing.T) {
 	t.Run("Refuse authentication when user info call fails", func(t *testing.T) {
 		t.Parallel()
 
-		client := NewMockHTTPClient(func(req *http.Request) *http.Response {
+		client := mocks.NewMockHTTPClient(func(req *http.Request) *http.Response {
 			url := req.URL.String()
 			switch url {
 			case googleTokenAPIURL:
@@ -79,7 +67,7 @@ func TestGoogleOAuthService_AuthenticateUserWithCode(t *testing.T) {
 	t.Run("Refuses authentication on malformed user info", func(t *testing.T) {
 		t.Parallel()
 
-		client := NewMockHTTPClient(func(req *http.Request) *http.Response {
+		client := mocks.NewMockHTTPClient(func(req *http.Request) *http.Response {
 			url := req.URL.String()
 			switch url {
 			case googleTokenAPIURL:
@@ -108,7 +96,7 @@ func TestGoogleOAuthService_AuthenticateUserWithCode(t *testing.T) {
 	t.Run("Accept authentication on user info", func(t *testing.T) {
 		t.Parallel()
 
-		client := NewMockHTTPClient(func(req *http.Request) *http.Response {
+		client := mocks.NewMockHTTPClient(func(req *http.Request) *http.Response {
 			url := req.URL.String()
 			switch url {
 			case googleTokenAPIURL:
@@ -140,7 +128,7 @@ func TestGoogleOAuthService_RedirectURL(t *testing.T) {
 	t.Run("RedirectURL Includes userinfo.email scope at minimum", func(t *testing.T) {
 		t.Parallel()
 
-		client := NewMockHTTPClient(func(req *http.Request) *http.Response {
+		client := mocks.NewMockHTTPClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: http.StatusTeapot,
 				Body:       ioutil.NopCloser(bytes.NewBufferString(`{}`)),
