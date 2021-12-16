@@ -11,6 +11,7 @@ import (
 	"github.com/p-l/fringe/internal/httpd/handlers"
 	"github.com/p-l/fringe/internal/httpd/helpers"
 	"github.com/p-l/fringe/internal/httpd/middlewares"
+	"github.com/p-l/fringe/internal/httpd/services"
 	"github.com/p-l/fringe/internal/repos"
 )
 
@@ -22,13 +23,9 @@ type Texts struct {
 
 const httpTimeouts = time.Second * 5
 
-// ServeHTTP Starts blocking HTTP server.
+// NewHTTPServer Create and configure the HTTP server.
 func NewHTTPServer(repo *repos.UserRepository, templates fs.FS, assets fs.FS, rootURL string, googleClientID string, googleClientSecret string, allowedDomain string, jwtSecret string, texts Texts) *http.Server {
-	googleOAuthConfig := handlers.GoogleOAuthClientConfig{
-		ID:          googleClientID,
-		Secret:      googleClientSecret,
-		RedirectURL: fmt.Sprintf("%s/auth/google/callback", rootURL),
-	}
+	googleOAuth := services.NewGoogleOAuthService(http.DefaultClient, googleClientID, googleClientSecret, fmt.Sprintf("%s/auth/google/callback", rootURL))
 
 	authHelper := helpers.NewAuthHelper(jwtSecret)
 	pageHelper := helpers.NewPageHelper(templates)
@@ -37,7 +34,7 @@ func NewHTTPServer(repo *repos.UserRepository, templates fs.FS, assets fs.FS, ro
 	authMiddleware := middlewares.NewAuthMiddleware("/auth", []string{"/assets"}, authHelper)
 
 	homeHandler := handlers.NewHomeHandler(repo)
-	authHandler := handlers.NewAuthHandler(allowedDomain, googleOAuthConfig, authHelper)
+	authHandler := handlers.NewAuthHandler(allowedDomain, googleOAuth, authHelper)
 	userHandler := handlers.NewUserHandler(repo, pageHelper, texts.PasswordHint, texts.PasswordInfoCardTitle, texts.PasswordInfoCardItems)
 
 	router := mux.NewRouter()
