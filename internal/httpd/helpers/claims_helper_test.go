@@ -17,7 +17,7 @@ func TestNewAuthClaims(t *testing.T) {
 		t.Parallel()
 		fake := faker.New()
 
-		claims := helpers.NewAuthClaims(fake.Internet().Email())
+		claims := helpers.NewAuthClaims(fake.Internet().Email(), "")
 
 		assert.Greater(t, claims.StandardClaims.ExpiresAt, time.Now().Unix())
 	})
@@ -30,7 +30,7 @@ func TestContextWithClaims(t *testing.T) {
 		t.Parallel()
 		fake := faker.New()
 
-		claims := helpers.NewAuthClaims(fake.Internet().Email())
+		claims := helpers.NewAuthClaims(fake.Internet().Email(), "")
 		claimsCtx := claims.ContextWithClaims(context.Background())
 
 		claimsFromContext, ok := helpers.AuthClaimsFromContext(claimsCtx)
@@ -57,7 +57,7 @@ func TestAuthClaimsFromContext(t *testing.T) {
 		t.Parallel()
 		fake := faker.New()
 
-		claims := helpers.NewAuthClaims(fake.Internet().Email())
+		claims := helpers.NewAuthClaims(fake.Internet().Email(), "")
 		claimsCtx := claims.ContextWithClaims(context.Background())
 
 		claimsFromContext, ok := helpers.AuthClaimsFromContext(claimsCtx)
@@ -75,7 +75,7 @@ func TestRefresh(t *testing.T) {
 		t.Parallel()
 		fake := faker.New()
 
-		claims := helpers.NewAuthClaims(fake.Internet().Email())
+		claims := helpers.NewAuthClaims(fake.Internet().Email(), "")
 		claimsOriginalExpiry := time.Now().Add(-1 * time.Minute).Unix()
 		claims.StandardClaims.ExpiresAt = claimsOriginalExpiry
 		returnedClaims := claims.Refresh()

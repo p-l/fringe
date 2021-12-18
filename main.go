@@ -102,6 +102,7 @@ func main() {
 		staticTemplates,
 		staticAssets,
 		viper.GetString("http.root-url"),
+		viper.GetStringSlice("fringe.admin-emails"),
 		viper.GetString("google-oauth.client-id"),
 		viper.GetString("google-oauth.client-secret"),
 		viper.GetString("fringe.allowed-domain"),

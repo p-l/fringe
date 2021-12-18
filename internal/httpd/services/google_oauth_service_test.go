@@ -3,12 +3,12 @@ package services_test
 import (
 	"bytes"
 	"context"
-	"github.com/p-l/fringe/internal/mocks"
 	"io/ioutil"
 	"net/http"
 	"testing"
 
 	"github.com/p-l/fringe/internal/httpd/services"
+	"github.com/p-l/fringe/internal/mocks"
 	"github.com/stretchr/testify/assert"
 )
 

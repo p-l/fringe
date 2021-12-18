@@ -21,10 +21,10 @@ func TestAuthHandler_RootHandler(t *testing.T) {
 	t.Run("Redirects to google", func(t *testing.T) {
 		t.Parallel()
 
-		authPath := "/auth"
+		authPath := "/auth/"
 
 		googleOAuth := services.NewGoogleOAuthService(nil, "id", "secret", "callback")
-		authHandler := handlers.NewAuthHandler("test.com", googleOAuth, nil)
+		authHandler := handlers.NewAuthHandler(googleOAuth, nil)
 
 		req := httptest.NewRequest(http.MethodGet, authPath, nil)
 		res := httptest.NewRecorder()
@@ -50,7 +50,7 @@ func TestAuthHandler_GoogleCallbackHandler(t *testing.T) {
 	t.Run("Refuse authentication to outside domains", func(t *testing.T) {
 		t.Parallel()
 
-		callbackPath := "/auth"
+		callbackPath := "/auth/google/callback"
 
 		client := mocks.NewMockHTTPClient(func(req *http.Request) *http.Response {
 			url := req.URL.String()
@@ -72,9 +72,9 @@ func TestAuthHandler_GoogleCallbackHandler(t *testing.T) {
 		})
 
 		googleOAuth := services.NewGoogleOAuthService(client, "id", "secret", "callback")
-		authHelper := helpers.NewAuthHelper("secret")
+		authHelper := helpers.NewAuthHelper("test.com", "secret", []string{})
 
-		authHandler := handlers.NewAuthHandler("test.com", googleOAuth, authHelper)
+		authHandler := handlers.NewAuthHandler(googleOAuth, authHelper)
 
 		req := httptest.NewRequest(http.MethodGet, callbackPath, nil)
 		res := httptest.NewRecorder()
@@ -93,7 +93,7 @@ func TestAuthHandler_GoogleCallbackHandler(t *testing.T) {
 	t.Run("Set cookie on successful auth", func(t *testing.T) {
 		t.Parallel()
 
-		callbackPath := "/auth"
+		callbackPath := "/auth/google/callback"
 
 		client := mocks.NewMockHTTPClient(func(req *http.Request) *http.Response {
 			url := req.URL.String()
@@ -115,9 +115,9 @@ func TestAuthHandler_GoogleCallbackHandler(t *testing.T) {
 		})
 
 		googleOAuth := services.NewGoogleOAuthService(client, "id", "secret", "callback")
-		authHelper := helpers.NewAuthHelper("secret")
+		authHelper := helpers.NewAuthHelper("test.com", "secret", []string{})
 
-		authHandler := handlers.NewAuthHandler("test.com", googleOAuth, authHelper)
+		authHandler := handlers.NewAuthHandler(googleOAuth, authHelper)
 
 		req := httptest.NewRequest(http.MethodGet, callbackPath, nil)
 		res := httptest.NewRecorder()

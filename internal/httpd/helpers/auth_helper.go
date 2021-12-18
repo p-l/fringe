@@ -4,18 +4,25 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt"
 )
 
 type AuthHelper struct {
-	secret string
+	secret        string
+	admins        []string
+	AllowedDomain string
 }
 
-func NewAuthHelper(secret string) *AuthHelper {
+var ErrInvalidClaimsToken = errors.New("invalid claims token")
+
+func NewAuthHelper(allowedDomain string, secret string, adminsEmail []string) *AuthHelper {
 	return &AuthHelper{
-		secret: secret,
+		secret:        secret,
+		admins:        adminsEmail,
+		AllowedDomain: allowedDomain,
 	}
 }
 
@@ -39,8 +46,6 @@ func (h *AuthHelper) NewJWTCookieFromClaims(claims *AuthClaims) *http.Cookie {
 		Secure:   true,
 	}
 }
-
-var ErrInvalidClaimsToken = errors.New("invalid claims token")
 
 func (h *AuthHelper) AuthClaimsFromSignedToken(tokenString string) (*AuthClaims, error) {
 	claims := &AuthClaims{}
@@ -70,4 +75,18 @@ func (h *AuthHelper) RemoveJWTCookie() *http.Cookie {
 		HttpOnly: true,
 		Secure:   true,
 	}
+}
+
+func (h *AuthHelper) InAllowedDomain(email string) bool {
+	return IsEmailInDomain(email, h.AllowedDomain)
+}
+
+func (h *AuthHelper) PermissionsForEmail(email string) string {
+	for _, adminEmail := range h.admins {
+		if strings.EqualFold(adminEmail, email) {
+			return "admin"
+		}
+	}
+
+	return "user"
 }

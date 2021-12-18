@@ -7,9 +7,10 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"net/mail"
 	"net/url"
 	"strings"
+
+	"github.com/p-l/fringe/internal/httpd/helpers"
 )
 
 type GoogleOAuthService struct {
@@ -41,12 +42,6 @@ func NewGoogleOAuthService(httpClient *http.Client, clientID string, clientSecre
 		ClientCallbackURL: clientCallbackURL,
 		httpClient:        httpClient,
 	}
-}
-
-func isValidEmail(email string) bool {
-	_, err := mail.ParseAddress(email)
-
-	return err == nil
 }
 
 func (g *GoogleOAuthService) fetchGoogleTokenFromCallbackCode(ctx context.Context, code string) (auth *googleAuthResponse, err error) {
@@ -121,7 +116,7 @@ func (g *GoogleOAuthService) fetchGoogleUserInfoWithToken(ctx context.Context, t
 		return nil, fmt.Errorf("failed to parse userinfo: %w", err)
 	}
 
-	if !isValidEmail(googleUserInfo.Email) {
+	if !helpers.IsEmailValid(googleUserInfo.Email) {
 		return nil, fmt.Errorf("invalid email '%s': %w", googleUserInfo.Email, ErrGoogleAuthenticationFailed)
 	}
 

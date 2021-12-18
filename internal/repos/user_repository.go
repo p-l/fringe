@@ -224,3 +224,69 @@ func (r *UserRepository) AuthenticateUser(email string, password string) (bool, 
 
 	return user.PasswordMatch(password), nil
 }
+
+const UserRepositoryListMaxLimit = 100
+
+// AllUsers Return list of users sorted by email.
+// Passing 0 as the limit will use UserRepositoryListMaxLimit as the limit.
+// Page 0 and 1 are seen as the same page number essentially: `offset = (page - 1) * limit`.
+func (r *UserRepository) AllUsers(limit int, page int) ([]User, error) {
+	offset := 0
+
+	if limit == 0 || limit > UserRepositoryListMaxLimit {
+		limit = UserRepositoryListMaxLimit
+	}
+
+	if page > 1 {
+		offset = (page - 1) * limit
+	}
+
+	var users []User
+
+	err := r.db.Select(&users, "SELECT * FROM users ORDER BY email LIMIT $1 OFFSET $2 ", limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve users (limit: %d offset:%d) %w", limit, offset, err)
+	}
+
+	if users == nil {
+		return nil, ErrUserNotFound
+	}
+
+	return users, nil
+}
+
+// DeleteUser delete user record for given email.
+func (r *UserRepository) DeleteUser(email string) error {
+	delTx, err := r.db.Begin()
+	if err != nil {
+		return fmt.Errorf("could not delte %s: %w", email, err)
+	}
+	defer func() { _ = delTx.Rollback() }() //nolint:wsl
+
+	delStmt, err := delTx.Prepare("DELETE FROM users WHERE email == $1")
+	if err != nil {
+		return fmt.Errorf("could not delete %s: %w ", email, err)
+	}
+	defer delStmt.Close()
+
+	result, err := delStmt.Exec(email)
+	if err != nil {
+		return fmt.Errorf("could not delete %s: %w", email, err)
+	}
+
+	err = delTx.Commit()
+	if err != nil {
+		return fmt.Errorf("could not delete %s: %w", email, err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("could not delete %s: %w", email, err)
+	}
+
+	if rowsAffected != 1 {
+		return ErrUserNotFound
+	}
+
+	return nil
+}

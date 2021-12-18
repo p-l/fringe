@@ -28,7 +28,7 @@ func dbOpen() (*sqlx.DB, sqlmock.Sqlmock) {
 	return db, mockSQL
 }
 
-func TestCreateUser(t *testing.T) {
+func TestUserRepository_CreateUser(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Returns new user when creating", func(t *testing.T) {
@@ -115,7 +115,7 @@ func TestCreateUser(t *testing.T) {
 	})
 }
 
-func TestUserWithEmail(t *testing.T) {
+func TestUserRepository_UserWithEmail(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Returns unmodified user when found", func(t *testing.T) {
@@ -166,7 +166,8 @@ func TestUserWithEmail(t *testing.T) {
 		email := fake.Internet().Email()
 
 		// Return the fake User
-		mockSQL.ExpectQuery("SELECT").WillReturnRows(sqlmock.NewRows([]string{"email", "password", "created_at", "updated_at", "last_seen_at"}))
+		mockSQL.ExpectQuery("SELECT").WillReturnRows(
+			sqlmock.NewRows([]string{"email", "password", "created_at", "updated_at", "last_seen_at"}))
 
 		userRepo, _ := repos.NewUserRepository(db)
 
@@ -181,7 +182,7 @@ func TestUserWithEmail(t *testing.T) {
 	})
 }
 
-func TestUpdateUserPassword(t *testing.T) {
+func TestUserRepository_UpdateUserPassword(t *testing.T) {
 	t.Parallel()
 	t.Run("Fails with unknown user", func(t *testing.T) {
 		t.Parallel()
@@ -239,7 +240,7 @@ func TestUpdateUserPassword(t *testing.T) {
 	})
 }
 
-func TestTouchUser(t *testing.T) {
+func TestUserRepository_TouchUser(t *testing.T) {
 	t.Parallel()
 	t.Run("Fails with unknown user", func(t *testing.T) {
 		t.Parallel()
@@ -294,7 +295,7 @@ func TestTouchUser(t *testing.T) {
 	})
 }
 
-func TestAuthenticateUser(t *testing.T) {
+func TestUserRepository_AuthenticateUser(t *testing.T) {
 	t.Parallel()
 	t.Run("Returns UserNotFound when not found", func(t *testing.T) {
 		t.Parallel()
@@ -344,6 +345,135 @@ func TestAuthenticateUser(t *testing.T) {
 		success, err := userRepo.AuthenticateUser(email, password)
 		assert.Nil(t, err)
 		assert.True(t, success)
+
+		// we make sure that all expectations were met
+		if err := mockSQL.ExpectationsWereMet(); err != nil {
+			t.Errorf("there were unfulfilled expectations: %s", err)
+		}
+	})
+}
+
+func TestUserRepository_AllUsers(t *testing.T) {
+	t.Parallel()
+	t.Run("Return error when no users are in the db", func(t *testing.T) {
+		t.Parallel()
+
+		db, mockSQL := dbOpen()
+		defer db.Close()
+
+		// Return the fake User
+		mockSQL.ExpectQuery("SELECT").WillReturnRows(
+			sqlmock.NewRows([]string{"email", "password", "created_at", "updated_at", "last_seen_at"}))
+
+		userRepo, err := repos.NewUserRepository(db)
+		assert.NoError(t, err)
+
+		users, err := userRepo.AllUsers(0, 0)
+		assert.ErrorIs(t, err, repos.ErrUserNotFound)
+		assert.Nil(t, users)
+
+		// we make sure that all expectations were met
+		if err := mockSQL.ExpectationsWereMet(); err != nil {
+			t.Errorf("there were unfulfilled expectations: %s", err)
+		}
+	})
+
+	t.Run("Return all users if there are more than users db", func(t *testing.T) {
+		t.Parallel()
+
+		db, mockSQL := dbOpen()
+		defer db.Close()
+
+		fake := faker.New()
+		email := fake.Internet().Email()
+		password := fake.Internet().Password()
+		passwordHash, _ := repos.CreatePasswordHash(password)
+		createdAt := fake.Time().Unix(time.Now())
+		updatedAt := fake.Time().Unix(time.Now())
+		lastSeenAt := fake.Time().Unix(time.Now())
+
+		// Return the fake User
+		mockSQL.ExpectQuery("SELECT").WillReturnRows(
+			sqlmock.NewRows([]string{"email", "password", "created_at", "updated_at", "last_seen_at"}).AddRow(email, passwordHash, createdAt, updatedAt, lastSeenAt))
+
+		userRepo, err := repos.NewUserRepository(db)
+		assert.NoError(t, err)
+
+		users, err := userRepo.AllUsers(0, 0)
+		assert.NoError(t, err)
+		assert.NotNil(t, users)
+		assert.Len(t, users, 1)
+		assert.Equal(t, email, users[0].Email)
+
+		// we make sure that all expectations were met
+		if err := mockSQL.ExpectationsWereMet(); err != nil {
+			t.Errorf("there were unfulfilled expectations: %s", err)
+		}
+	})
+
+	t.Run("follow request limit", func(t *testing.T) {
+		t.Parallel()
+
+		db, mockSQL := dbOpen()
+		defer db.Close()
+
+		fake := faker.New()
+		createdAt := fake.Time().Unix(time.Now())
+		updatedAt := fake.Time().Unix(time.Now())
+		lastSeenAt := fake.Time().Unix(time.Now())
+
+		// BD with 3 users
+		mockRows := sqlmock.NewRows([]string{"email", "password", "created_at", "updated_at", "last_seen_at"})
+		mockRows.AddRow(fake.Internet().Email(), fake.Internet().Password(), createdAt, updatedAt, lastSeenAt)
+		mockRows.AddRow(fake.Internet().Email(), fake.Internet().Password(), createdAt, updatedAt, lastSeenAt)
+		mockSQL.ExpectQuery("SELECT").WithArgs(2, 0).WillReturnRows(mockRows)
+
+		userRepo, err := repos.NewUserRepository(db)
+		assert.NoError(t, err)
+
+		users, err := userRepo.AllUsers(2, 0)
+		assert.NoError(t, err)
+		assert.NotNil(t, users)
+		assert.Len(t, users, 2)
+
+		// we make sure that all expectations were met
+		if err := mockSQL.ExpectationsWereMet(); err != nil {
+			t.Errorf("there were unfulfilled expectations: %s", err)
+		}
+	})
+
+	t.Run("page 0 and 1 are the same", func(t *testing.T) {
+		t.Parallel()
+
+		db, mockSQL := dbOpen()
+		defer db.Close()
+
+		fake := faker.New()
+		createdAt := fake.Time().Unix(time.Now())
+		updatedAt := fake.Time().Unix(time.Now())
+		lastSeenAt := fake.Time().Unix(time.Now())
+
+		firstQueryRows := sqlmock.NewRows([]string{"email", "password", "created_at", "updated_at", "last_seen_at"})
+		firstQueryRows.AddRow(fake.Internet().Email(), fake.Internet().Password(), createdAt, updatedAt, lastSeenAt)
+		firstQueryRows.AddRow(fake.Internet().Email(), fake.Internet().Password(), createdAt, updatedAt, lastSeenAt)
+		mockSQL.ExpectQuery("SELECT").WithArgs(2, 0).WillReturnRows(firstQueryRows)
+
+		userRepo, err := repos.NewUserRepository(db)
+		assert.NoError(t, err)
+
+		users, err := userRepo.AllUsers(2, 1)
+		assert.NoError(t, err)
+		assert.NotNil(t, users)
+		assert.Len(t, users, 2)
+
+		secondQueryRows := sqlmock.NewRows([]string{"email", "password", "created_at", "updated_at", "last_seen_at"})
+		secondQueryRows.AddRow(fake.Internet().Email(), fake.Internet().Password(), createdAt, updatedAt, lastSeenAt)
+		secondQueryRows.AddRow(fake.Internet().Email(), fake.Internet().Password(), createdAt, updatedAt, lastSeenAt)
+		mockSQL.ExpectQuery("SELECT").WithArgs(2, 0).WillReturnRows(secondQueryRows)
+		users, err = userRepo.AllUsers(2, 0)
+		assert.NoError(t, err)
+		assert.NotNil(t, users)
+		assert.Len(t, users, 2)
 
 		// we make sure that all expectations were met
 		if err := mockSQL.ExpectationsWereMet(); err != nil {

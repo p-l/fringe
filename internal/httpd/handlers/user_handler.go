@@ -2,10 +2,13 @@ package handlers
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
-	"net/url"
+	"strconv"
+	"strings"
 
+	"github.com/gorilla/mux"
 	"github.com/p-l/fringe/internal/httpd/helpers"
 	"github.com/p-l/fringe/internal/repos"
 	"github.com/sethvargo/go-password/password"
@@ -13,18 +16,27 @@ import (
 
 type UserHandler struct {
 	userRepo     *repos.UserRepository
+	authHelper   *helpers.AuthHelper
 	pageHelper   *helpers.PageHelper
 	passwordHint string
 	infoTitle    string
 	infoItems    []string
 }
 
-type UserTemplateData struct {
-	Email        string
-	Password     string
-	PasswordHint string
-	InfoTitle    string
-	InfoItems    []string
+type UserViewTemplateData struct {
+	Email            string
+	Password         string
+	PasswordHint     string
+	InfoTitle        string
+	InfoItems        []string
+	ShowUserListLink bool
+}
+
+type UserListTemplateData struct {
+	Users     []repos.User
+	Page      int
+	LastPage  bool
+	FirstPage bool
 }
 
 const (
@@ -33,9 +45,10 @@ const (
 	newUserPasswordNumOfSymbols = 2
 )
 
-func NewUserHandler(userRepo *repos.UserRepository, pageHelper *helpers.PageHelper, paaswordHint string, infoTitle string, infoItems []string) *UserHandler {
+func NewUserHandler(userRepo *repos.UserRepository, authHelper *helpers.AuthHelper, pageHelper *helpers.PageHelper, paaswordHint string, infoTitle string, infoItems []string) *UserHandler {
 	return &UserHandler{
 		userRepo:     userRepo,
+		authHelper:   authHelper,
 		pageHelper:   pageHelper,
 		passwordHint: paaswordHint,
 		infoTitle:    infoTitle,
@@ -43,33 +56,84 @@ func NewUserHandler(userRepo *repos.UserRepository, pageHelper *helpers.PageHelp
 	}
 }
 
+func claimsAllowsForUserPage(claims *helpers.AuthClaims, targetEmail string) bool {
+	return claims != nil && (strings.EqualFold(claims.Email, targetEmail) || claims.IsAdmin())
+}
+
 func (u *UserHandler) List(httpResponse http.ResponseWriter, httpRequest *http.Request) {
 	defer func() { _ = httpRequest.Body.Close() }()
+	pageNumber := 0
 
-	// claims, _ := httpRequest.Context().Value(helpers.AuthClaimsContextKey).(helpers.AuthClaims)
-	// email = claims.Email
+	pageQueried := httpRequest.URL.Query().Get("page")
+	if len(pageQueried) > 0 {
+		page, err := strconv.ParseInt(pageQueried, 10, 64)
+		if err != nil {
+			log.Printf("User/List [%v]: Could not parse page number '%s', defaulting to 0", httpRequest.RemoteAddr, pageQueried)
+			page = 0
+		}
+		pageNumber = int(page)
+	}
 
-	http.Error(httpResponse, "Not implemented yet", http.StatusNotImplemented)
+	claims, ok := helpers.AuthClaimsFromContext(httpRequest.Context())
+	if !ok {
+		log.Printf("User/List [%v]: failed to retrieve claims", httpRequest.RemoteAddr)
+		http.Error(httpResponse, "could not extract claims from context", http.StatusInternalServerError)
+
+		return
+	}
+
+	if !claims.IsAdmin() {
+		log.Printf("User/List [%v]: %s is not allowed to list users", httpRequest.RemoteAddr, claims.Email)
+		http.Error(httpResponse, "not authorized to list users", http.StatusUnauthorized)
+
+		return
+	}
+
+	users, err := u.userRepo.AllUsers(0, pageNumber)
+	if !errors.Is(err, repos.ErrUserNotFound) && err != nil {
+		log.Printf("User/List [%v]: could not retrieve users: %v", httpRequest.RemoteAddr, err)
+		http.Error(httpResponse, "could not extract claims from context", http.StatusInternalServerError)
+
+		return
+	}
+
+	data := UserListTemplateData{
+		Users:     users,
+		Page:      pageNumber,
+		LastPage:  true,
+		FirstPage: false,
+		// LastPage:  len(users) < repos.UserRepositoryListMaxLimit,
+		// FirstPage: pageNumber <= 1,
+	}
+
+	err = u.pageHelper.RenderPage(httpResponse, "user/list.gohtml", data)
+	if err != nil {
+		log.Printf("User/List [%v]: template error: %v", httpRequest.RemoteAddr, err)
+		http.Error(httpResponse, "Missing Template File", http.StatusInternalServerError)
+
+		return
+	}
 }
 
 func (u *UserHandler) View(httpResponse http.ResponseWriter, httpRequest *http.Request) {
 	defer func() { _ = httpRequest.Body.Close() }()
 
 	claims, _ := helpers.AuthClaimsFromContext(httpRequest.Context())
-	email := claims.Email
-	data := UserTemplateData{
-		Email:        email,
-		PasswordHint: u.passwordHint,
-		InfoTitle:    u.infoTitle,
-		InfoItems:    u.infoItems,
+	vars := mux.Vars(httpRequest)
+	email := vars["email"]
+
+	data := UserViewTemplateData{
+		Email:            email,
+		PasswordHint:     u.passwordHint,
+		InfoTitle:        u.infoTitle,
+		InfoItems:        u.infoItems,
+		ShowUserListLink: claims.IsAdmin(),
 	}
 
 	err := u.pageHelper.RenderPage(httpResponse, "user/show.gohtml", data)
 	if err != nil {
 		log.Printf("User/View [%v]: template error: %v", httpRequest.RemoteAddr, err)
 		http.Error(httpResponse, "Missing Template File", http.StatusInternalServerError)
-
-		return
 	}
 }
 
@@ -80,7 +144,15 @@ func (u *UserHandler) Renew(httpResponse http.ResponseWriter, httpRequest *http.
 	forceHTTPNoCache(httpResponse)
 
 	claims, _ := helpers.AuthClaimsFromContext(httpRequest.Context())
-	email := claims.Email
+	vars := mux.Vars(httpRequest)
+	email := vars["email"]
+
+	if !claimsAllowsForUserPage(claims, email) {
+		log.Printf("User/Renew [%v]: %s cannot renew password for %s", httpRequest.RemoteAddr, claims.Email, email)
+		http.Redirect(httpResponse, httpRequest, "/", http.StatusFound)
+
+		return
+	}
 
 	// Generate a password that is 64 characters long with 10 digits, 10 symbols,
 	// allowing upper and lower case letters, disallowing repeat characters.
@@ -107,15 +179,22 @@ func (u *UserHandler) Renew(httpResponse http.ResponseWriter, httpRequest *http.
 		return
 	}
 
-	data := UserTemplateData{
-		Email:        email,
-		Password:     pwd,
-		PasswordHint: u.passwordHint,
-		InfoTitle:    u.infoTitle,
-		InfoItems:    u.infoItems,
+	u.renderPasswordPage(httpResponse, httpRequest, email, pwd)
+}
+
+func (u *UserHandler) renderPasswordPage(httpResponse http.ResponseWriter, httpRequest *http.Request, email string, password string) {
+	claims, _ := helpers.AuthClaimsFromContext(httpRequest.Context())
+
+	data := UserViewTemplateData{
+		Email:            email,
+		Password:         password,
+		PasswordHint:     u.passwordHint,
+		InfoTitle:        u.infoTitle,
+		InfoItems:        u.infoItems,
+		ShowUserListLink: claims.IsAdmin(),
 	}
 
-	err = u.pageHelper.RenderPage(httpResponse, "user/password.gohtml", data)
+	err := u.pageHelper.RenderPage(httpResponse, "user/password.gohtml", data)
 	if err != nil {
 		log.Printf("User/View [%v]: template error: %v", httpRequest.RemoteAddr, err)
 		http.Error(httpResponse, "Missing Template File", http.StatusInternalServerError)
@@ -131,7 +210,22 @@ func (u *UserHandler) Enroll(httpResponse http.ResponseWriter, httpRequest *http
 	forceHTTPNoCache(httpResponse)
 
 	claims, _ := helpers.AuthClaimsFromContext(httpRequest.Context())
-	email := claims.Email
+	vars := mux.Vars(httpRequest)
+	email := vars["email"]
+
+	if !claimsAllowsForUserPage(claims, email) {
+		log.Printf("User/Renew [%v]: %s cannot renew password for %s", httpRequest.RemoteAddr, claims.Email, email)
+		http.Redirect(httpResponse, httpRequest, "/", http.StatusFound)
+
+		return
+	}
+
+	if !helpers.IsEmailValid(email) || !u.authHelper.InAllowedDomain(email) {
+		log.Printf("User/New [%v]: Invalid email: %s", httpRequest.RemoteAddr, email)
+		http.Error(httpResponse, "failed to create user", http.StatusInternalServerError)
+
+		return
+	}
 
 	// Generate a password that is 64 characters long with 10 digits, 10 symbols,
 	// allowing upper and lower case letters, disallowing repeat characters.
@@ -151,18 +245,53 @@ func (u *UserHandler) Enroll(httpResponse http.ResponseWriter, httpRequest *http
 		return
 	}
 
-	log.Printf("User/New [%v]: created user %s", httpRequest.RemoteAddr, user.Email)
-	userPath := url.PathEscape("/user/" + user.Email)
-	http.Redirect(httpResponse, httpRequest, userPath, http.StatusFound)
+	if errors.Is(err, repos.ErrUserAlreadyExist) {
+		log.Printf("User/New [%v]: user %s exists!", httpRequest.RemoteAddr, user.Email)
+		http.Redirect(httpResponse, httpRequest, fmt.Sprintf("/user/%s/", email), http.StatusFound)
+
+		return
+	}
+
+	log.Printf("User/New [%v]: user %s created!", httpRequest.RemoteAddr, user.Email)
+	u.renderPasswordPage(httpResponse, httpRequest, email, pwd)
 }
 
 func (u *UserHandler) Delete(httpResponse http.ResponseWriter, httpRequest *http.Request) {
 	defer func() { _ = httpRequest.Body.Close() }()
 
-	// claims, _ := httpRequest.Context().Value(helpers.AuthClaimsContextKey).(helpers.AuthClaims)
-	// email = claims.Email
+	claims, _ := helpers.AuthClaimsFromContext(httpRequest.Context())
+	vars := mux.Vars(httpRequest)
+	email := vars["email"]
 
-	http.Error(httpResponse, "Not implemented yet", http.StatusNotImplemented)
+	if !claims.IsAdmin() {
+		log.Printf("User/Delete [%v]: %s attempted to delete user %s without permission", httpRequest.RemoteAddr, claims.Email, email)
+		http.Redirect(httpResponse, httpRequest, "/", http.StatusFound)
+
+		return
+	}
+
+	if !helpers.IsEmailValid(email) {
+		log.Printf("User/Delete [%v]: Invalid email: %s", httpRequest.RemoteAddr, email)
+		http.Redirect(httpResponse, httpRequest, "/", http.StatusFound)
+
+		return
+	}
+
+	err := u.userRepo.DeleteUser(email)
+	if err != nil && !errors.Is(err, repos.ErrUserNotFound) {
+		log.Printf("User/Delete [%v]: failed to delete %s : %v", httpRequest.RemoteAddr, email, err)
+		http.Error(httpResponse, "operation failed", http.StatusInternalServerError)
+
+		return
+	}
+
+	if errors.Is(err, repos.ErrUserNotFound) {
+		log.Printf("User/Delete [%v]: user %s doesn't exist", httpRequest.RemoteAddr, email)
+	} else {
+		log.Printf("User/Delete [%v]: user %s DELETED", httpRequest.RemoteAddr, email)
+	}
+
+	http.Redirect(httpResponse, httpRequest, "/user/", http.StatusFound)
 }
 
 func forceHTTPNoCache(httpResponse http.ResponseWriter) {

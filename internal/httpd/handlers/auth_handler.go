@@ -3,23 +3,20 @@ package handlers
 import (
 	"log"
 	"net/http"
-	"strings"
 
 	"github.com/p-l/fringe/internal/httpd/helpers"
 	"github.com/p-l/fringe/internal/httpd/services"
 )
 
 type AuthHandler struct {
-	authHelper    *helpers.AuthHelper
-	googleOAuth   *services.GoogleOAuthService
-	allowedDomain string
+	authHelper  *helpers.AuthHelper
+	googleOAuth *services.GoogleOAuthService
 }
 
-func NewAuthHandler(allowedDomain string, googleOAuthService *services.GoogleOAuthService, authHelper *helpers.AuthHelper) *AuthHandler {
+func NewAuthHandler(googleOAuthService *services.GoogleOAuthService, authHelper *helpers.AuthHelper) *AuthHandler {
 	return &AuthHandler{
-		authHelper:    authHelper,
-		googleOAuth:   googleOAuthService,
-		allowedDomain: allowedDomain,
+		authHelper:  authHelper,
+		googleOAuth: googleOAuthService,
 	}
 }
 
@@ -39,14 +36,15 @@ func (a *AuthHandler) GoogleCallbackHandler(httpResponse http.ResponseWriter, ht
 		return
 	}
 
-	if !strings.Contains(googleUserInfo.Email, "@"+a.allowedDomain) {
-		log.Printf("Auth [src:%v] email (%s) is not in allowed domain (%s)", httpRequest.RemoteAddr, googleUserInfo.Email, a.allowedDomain)
+	if !a.authHelper.InAllowedDomain(googleUserInfo.Email) {
+		log.Printf("Auth [src:%v] email (%s) is not in allowed domain (%s)", httpRequest.RemoteAddr, googleUserInfo.Email, a.authHelper.AllowedDomain)
 		http.Error(httpResponse, "Domain is not allowed", http.StatusUnauthorized)
 
 		return
 	}
 
-	claims := helpers.NewAuthClaims(googleUserInfo.Email)
+	permissions := a.authHelper.PermissionsForEmail(googleUserInfo.Email)
+	claims := helpers.NewAuthClaims(googleUserInfo.Email, permissions)
 	cookie := a.authHelper.NewJWTCookieFromClaims(claims)
 	http.SetCookie(httpResponse, cookie)
 	http.Redirect(httpResponse, httpRequest, "/", http.StatusFound)

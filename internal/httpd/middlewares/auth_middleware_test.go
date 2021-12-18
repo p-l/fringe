@@ -20,7 +20,7 @@ func TestEnsureAuth(t *testing.T) {
 		t.Parallel()
 
 		authPath := "/test/auth"
-		authHelper := helpers.NewAuthHelper("secret")
+		authHelper := helpers.NewAuthHelper("@test.com", "secret", []string{})
 		authMiddleware := middlewares.NewAuthMiddleware(authPath, []string{}, authHelper)
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -47,7 +47,7 @@ func TestEnsureAuth(t *testing.T) {
 		testSkipAuthRootPath := "/skip-auth"
 		testSkipAuthSubPath := testSkipAuthRootPath + "/test"
 		skipPaths := []string{testSkipAuthRootPath}
-		authHelper := helpers.NewAuthHelper("secret")
+		authHelper := helpers.NewAuthHelper("@test.com", "secret", []string{})
 		authMiddleware := middlewares.NewAuthMiddleware(testSkipAuthRootPath, skipPaths, authHelper)
 
 		req := httptest.NewRequest(http.MethodGet, testSkipAuthSubPath, nil)
@@ -72,10 +72,10 @@ func TestEnsureAuth(t *testing.T) {
 		t.Parallel()
 		fake := faker.New()
 
-		authHelper := helpers.NewAuthHelper("secret")
-		authMiddleware := middlewares.NewAuthMiddleware("/auth", []string{"/no-auth"}, authHelper)
+		authHelper := helpers.NewAuthHelper("@test.com", "secret", []string{})
+		authMiddleware := middlewares.NewAuthMiddleware("/auth/", []string{"/no-auth"}, authHelper)
 
-		validClaims := helpers.NewAuthClaims(fake.Internet().Email())
+		validClaims := helpers.NewAuthClaims(fake.Internet().Email(), "")
 		// Force expiry to be 1 minute in the future
 		validClaims.StandardClaims.ExpiresAt = time.Now().Add(1 * time.Minute).Unix()
 		validTokenCookie := authHelper.NewJWTCookieFromClaims(validClaims)
@@ -112,11 +112,11 @@ func TestEnsureAuth(t *testing.T) {
 		t.Parallel()
 		fake := faker.New()
 
-		authPath := "/auth"
-		authHelper := helpers.NewAuthHelper("secret")
+		authPath := "/auth/"
+		authHelper := helpers.NewAuthHelper("@test.com", "secret", []string{})
 		authMiddleware := middlewares.NewAuthMiddleware(authPath, []string{"/no-auth"}, authHelper)
 
-		validClaims := helpers.NewAuthClaims(fake.Internet().Email())
+		validClaims := helpers.NewAuthClaims(fake.Internet().Email(), "")
 		// Force expiry to be 1 minute ago
 		validClaims.StandardClaims.ExpiresAt = time.Now().Add(-1 * time.Minute).Unix()
 		validTokenCookie := authHelper.NewJWTCookieFromClaims(validClaims)
