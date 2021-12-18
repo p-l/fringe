@@ -5,9 +5,12 @@ import (
 	"html/template"
 	"io"
 	"io/fs"
+	"path/filepath"
+	"reflect"
+	"time"
 )
 
-const baseLayoutFilename = "layouts/base.gohtml"
+const baseLayoutTemplate = "layouts/base.gohtml"
 
 type PageHelper struct {
 	files fs.FS
@@ -19,15 +22,29 @@ func NewPageHelper(templateFiles fs.FS) *PageHelper {
 	}
 }
 
-func (p *PageHelper) RenderPage(httpResponse io.Writer, filename string, data interface{}) error {
-	view, err := template.ParseFS(p.files, filename)
+func (p *PageHelper) RenderPage(httpResponse io.Writer, templateFile string, data interface{}) error { // Create the last function
+	templateBaseName := filepath.Base(templateFile)
+
+	// Insert `last` function
+	view := template.New(templateBaseName).Funcs(template.FuncMap{
+		"last": func(x int, a interface{}) bool {
+			return x == reflect.ValueOf(a).Len()-1
+		},
+		"unix_date_string": func(unix int64) string {
+			return time.Unix(unix, 0).String()
+		},
+	})
+
+	// Parse the template
+	parsedView, err := view.ParseFS(p.files, templateFile)
 	if err != nil {
-		return fmt.Errorf("error with %s template: %w", filename, err)
+		return fmt.Errorf("error with %s template: %w", templateFile, err)
 	}
 
-	base, err := view.ParseFS(p.files, baseLayoutFilename)
+	// Add the parsed base layout
+	base, err := parsedView.ParseFS(p.files, baseLayoutTemplate)
 	if err != nil {
-		return fmt.Errorf("error with base template: %w", err)
+		return fmt.Errorf("error with default template: %w", err)
 	}
 
 	if err = base.Execute(httpResponse, data); err != nil {
