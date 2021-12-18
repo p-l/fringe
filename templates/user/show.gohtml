@@ -1,13 +1,6 @@
-{{ template "base" . }}
-
+{{ template "default" . }}
 {{ define "title" }}{{ .Email }}{{ end }}
-
-{{ define "head" }}
-    <script>
-        function copyTextFieldToClipBoard(inputSelector, buttonSelector) {
-        }
-    </script>
-{{ end }}
+{{ define "head" }}{{ end }}
 
 {{ define "content"}}
     <div class="center-containers" style="">
@@ -18,8 +11,8 @@
             </div>
 
             <div class="line">
-                <button aria-label="new password" id="new-password" class="new-button" type="submit">
-                    I need a new password
+                <button aria-label="new password" id="new-password" class="big-button blue-button" type="submit">
+                    <i data-feather="key"></i>
                 </button>
             </div>
         </div>
@@ -37,6 +30,18 @@
                     {{ end }}
                 </ul>
             </div>
+        </div>
+        {{ end }}
+
+        {{ if .ShowUserListLink  }}
+        <div class="card">
+            <form method="get" action="/user/">
+                <div class="line">
+                <button aria-label="back" id="back-button" class="big-button dark-button" type="submit">
+                    <i data-feather="chevrons-left"></i>
+                </button>
+            </div>
+            </form>
         </div>
         {{ end }}
     </div>
