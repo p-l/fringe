@@ -4,7 +4,7 @@ import (
 	"embed"
 )
 
-//go:embed layouts/*.gohtml user/*.gohtml
+//go:embed layouts/*.gohtml default/*.gohtml user/*.gohtml
 var files embed.FS
 
 // Files returns a filesystem with static files.
