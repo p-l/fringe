@@ -1,16 +1,16 @@
 package mocks
 
 import (
-	"modernc.org/ql"
 	"os"
 	"testing"
 
 	"github.com/jaswdr/faker"
 	"github.com/jmoiron/sqlx"
 	"github.com/p-l/fringe/internal/repos"
+	"modernc.org/ql"
 )
 
-// NewMockUserRepository returns an actual repos.UserRepository setup with fake data in a temporary directory
+// NewMockUserRepository returns an actual repos.UserRepository setup with fake data in a temporary directory.
 func NewMockUserRepository(t *testing.T) *repos.UserRepository {
 	t.Helper()
 

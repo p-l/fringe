@@ -60,6 +60,12 @@ func claimsAllowsForUserPage(claims *helpers.AuthClaims, targetEmail string) boo
 	return claims != nil && (strings.EqualFold(claims.Email, targetEmail) || claims.IsAdmin())
 }
 
+func forceHTTPNoCache(httpResponse http.ResponseWriter) {
+	httpResponse.Header().Add("Cache-Control", "no-store, no-cache, must-revalidate")
+	httpResponse.Header().Add("Pragma", "no-cache")
+	httpResponse.Header().Add("Expires", "0")
+}
+
 func (u *UserHandler) List(httpResponse http.ResponseWriter, httpRequest *http.Request) {
 	defer func() { _ = httpRequest.Body.Close() }()
 	pageNumber := 0
@@ -122,6 +128,13 @@ func (u *UserHandler) View(httpResponse http.ResponseWriter, httpRequest *http.R
 	vars := mux.Vars(httpRequest)
 	email := vars["email"]
 
+	if !claimsAllowsForUserPage(claims, email) {
+		log.Printf("User/View [%v]: %s requested %s page without admin rights", httpRequest.RemoteAddr, claims.Email, email)
+		http.Redirect(httpResponse, httpRequest, fmt.Sprintf("/user/%s/", claims.Email), http.StatusFound)
+
+		return
+	}
+
 	data := UserViewTemplateData{
 		Email:            email,
 		PasswordHint:     u.passwordHint,
@@ -149,7 +162,7 @@ func (u *UserHandler) Renew(httpResponse http.ResponseWriter, httpRequest *http.
 
 	if !claimsAllowsForUserPage(claims, email) {
 		log.Printf("User/Renew [%v]: %s cannot renew password for %s", httpRequest.RemoteAddr, claims.Email, email)
-		http.Redirect(httpResponse, httpRequest, "/", http.StatusFound)
+		http.Redirect(httpResponse, httpRequest, fmt.Sprintf("/user/%s/", claims.Email), http.StatusFound)
 
 		return
 	}
@@ -214,8 +227,8 @@ func (u *UserHandler) Enroll(httpResponse http.ResponseWriter, httpRequest *http
 	email := vars["email"]
 
 	if !claimsAllowsForUserPage(claims, email) {
-		log.Printf("User/Renew [%v]: %s cannot renew password for %s", httpRequest.RemoteAddr, claims.Email, email)
-		http.Redirect(httpResponse, httpRequest, "/", http.StatusFound)
+		log.Printf("User/Renew [%v]: %s cannot enroll another user (%s)", httpRequest.RemoteAddr, claims.Email, email)
+		http.Redirect(httpResponse, httpRequest, fmt.Sprintf("/user/%s/", claims.Email), http.StatusFound)
 
 		return
 	}
@@ -265,7 +278,7 @@ func (u *UserHandler) Delete(httpResponse http.ResponseWriter, httpRequest *http
 
 	if !claims.IsAdmin() {
 		log.Printf("User/Delete [%v]: %s attempted to delete user %s without permission", httpRequest.RemoteAddr, claims.Email, email)
-		http.Redirect(httpResponse, httpRequest, "/", http.StatusFound)
+		http.Error(httpResponse, "not authorized to delete users", http.StatusUnauthorized)
 
 		return
 	}
@@ -292,10 +305,4 @@ func (u *UserHandler) Delete(httpResponse http.ResponseWriter, httpRequest *http
 	}
 
 	http.Redirect(httpResponse, httpRequest, "/user/", http.StatusFound)
-}
-
-func forceHTTPNoCache(httpResponse http.ResponseWriter) {
-	httpResponse.Header().Add("Cache-Control", "no-store, no-cache, must-revalidate")
-	httpResponse.Header().Add("Pragma", "no-cache")
-	httpResponse.Header().Add("Expires", "0")
 }

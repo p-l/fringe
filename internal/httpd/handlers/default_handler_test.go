@@ -1,17 +1,17 @@
 package handlers_test
 
 import (
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
 	"github.com/gorilla/mux"
-	"github.com/jaswdr/faker"
 	"github.com/p-l/fringe/internal/httpd/handlers"
 	"github.com/p-l/fringe/internal/httpd/helpers"
 	"github.com/p-l/fringe/internal/httpd/middlewares"
 	"github.com/p-l/fringe/internal/mocks"
 	"github.com/p-l/fringe/templates"
 	"github.com/stretchr/testify/assert"
-	"net/http"
-	"net/http/httptest"
-	"testing"
 )
 
 func TestDefaultHandler_Root(t *testing.T) {
@@ -74,17 +74,14 @@ func TestDefaultHandler_Root(t *testing.T) {
 
 	t.Run("Redirect if user is NOT enrolled", func(t *testing.T) {
 		t.Parallel()
-		fake := faker.New()
 
 		pageHelper := helpers.NewPageHelper(templates.Files())
 		userRepo := mocks.NewMockUserRepository(t)
 
 		authHelper := helpers.NewAuthHelper("test.com", "secret", []string{})
 		authMiddleware := middlewares.NewAuthMiddleware("/auth", []string{}, authHelper)
-
 		defaultHandler := handlers.NewDefaultHandler(userRepo, pageHelper)
-
-		claims := helpers.NewAuthClaims(fake.Internet().Email(), "")
+		claims := helpers.NewAuthClaims("user_does_not_exist@not_a_user.com", "")
 		tokenCookie := authHelper.NewJWTCookieFromClaims(claims)
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -94,7 +91,6 @@ func TestDefaultHandler_Root(t *testing.T) {
 
 		router := mux.NewRouter()
 		router.Use(authMiddleware.EnsureAuth)
-
 		router.HandleFunc("/", defaultHandler.Root)
 		router.ServeHTTP(res, req)
 
