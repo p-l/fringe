@@ -5,6 +5,9 @@
 # Secret used to protect the JWT used after authentication.
 # secret = "<SOME RANDOME SECRET STRING>"
 
+# Administration function are enabled for users with these emails
+# admin-emails = ["you@yourdomain.com"]
+
 [database]
 # Database location
 # database = /var/lib/fringe/fringe.db
@@ -25,3 +28,14 @@
 #
 # client-id = "GOOGLE_PROVIDED_CLIENT_ID.apps.googleusercontent.com"
 # client-secret = "GOOGLE_PROVIDED_CLIENT_SECRET"
+
+[texts.password]
+# Fringe does not support multiple language just yet. Until then, you can alter and insert text using configuration
+
+# Set a hint line under the password field (empty by default)
+# hint = "Save this password"
+
+# Add an info panel under password field to let users know where to use it. Title is the first line followed by
+# a list of items in an array (empty by default)
+# info-title = "Where to use"
+# info-items = ["Joining the enterprise wi-fi", "Connecting to the VPN"]
