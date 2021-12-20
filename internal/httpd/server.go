@@ -33,7 +33,7 @@ func NewHTTPServer(repo *repos.UserRepository, templates fs.FS, assets fs.FS, ro
 	logMiddleware := middlewares.NewLogMiddleware()
 	authMiddleware := middlewares.NewAuthMiddleware("/auth/", []string{"/assets"}, authHelper)
 
-	homeHandler := handlers.NewHomeHandler(repo, pageHelper)
+	homeHandler := handlers.NewDefaultHandler(repo, pageHelper)
 	authHandler := handlers.NewAuthHandler(googleOAuth, authHelper)
 	userHandler := handlers.NewUserHandler(repo, authHelper, pageHelper, texts.PasswordHint, texts.PasswordInfoCardTitle, texts.PasswordInfoCardItems)
 

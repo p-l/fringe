@@ -93,7 +93,7 @@ func TestAuthHandler_GoogleCallbackHandler(t *testing.T) {
 	t.Run("Set cookie on successful auth", func(t *testing.T) {
 		t.Parallel()
 
-		callbackPath := "/auth/google/callback"
+		callbackPath := "/auth/"
 
 		client := mocks.NewMockHTTPClient(func(req *http.Request) *http.Response {
 			url := req.URL.String()

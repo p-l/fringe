@@ -15,7 +15,11 @@ type DefaultHandler struct {
 	PageHelper *helpers.PageHelper
 }
 
-func NewHomeHandler(userRepo *repos.UserRepository, pageHelper *helpers.PageHelper) *DefaultHandler {
+type NotFoundTemplateData struct {
+	Path string
+}
+
+func NewDefaultHandler(userRepo *repos.UserRepository, pageHelper *helpers.PageHelper) *DefaultHandler {
 	return &DefaultHandler{
 		UserRepo:   userRepo,
 		PageHelper: pageHelper,
@@ -29,6 +33,8 @@ func (u *DefaultHandler) Root(httpResponse http.ResponseWriter, httpRequest *htt
 	if !success {
 		log.Printf("Home [%v]: Could not read context", httpRequest.RemoteAddr)
 		http.Error(httpResponse, "could not retrieve user information", http.StatusInternalServerError)
+
+		return
 	}
 
 	log.Printf("Home/Root [%v]: claims %v", httpRequest.RemoteAddr, claims.Email)
@@ -44,6 +50,8 @@ func (u *DefaultHandler) Root(httpResponse http.ResponseWriter, httpRequest *htt
 	if err != nil {
 		log.Printf("Home/Root [%v]: %v", httpRequest.RemoteAddr, err)
 		http.Error(httpResponse, "could not retrieve user information", http.StatusInternalServerError)
+
+		return
 	}
 
 	redirectPath := fmt.Sprintf("/user/%s/", claims.Email)
@@ -53,10 +61,6 @@ func (u *DefaultHandler) Root(httpResponse http.ResponseWriter, httpRequest *htt
 
 	log.Printf("Home [%v]: Redirecting to user's (%s) page %s", httpRequest.RequestURI, user.Email, redirectPath)
 	http.Redirect(httpResponse, httpRequest, redirectPath, http.StatusFound)
-}
-
-type NotFoundTemplateData struct {
-	Path string
 }
 
 func (u *DefaultHandler) NotFound(httpResponse http.ResponseWriter, httpRequest *http.Request) {
