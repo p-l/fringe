@@ -3,13 +3,13 @@ package handlers
 import (
 	"errors"
 	"fmt"
-	"github.com/mrz1836/go-sanitize"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/gorilla/mux"
+	"github.com/mrz1836/go-sanitize"
 	"github.com/p-l/fringe/internal/httpd/helpers"
 	"github.com/p-l/fringe/internal/repos"
 	"github.com/sethvargo/go-password/password"

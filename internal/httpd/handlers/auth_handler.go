@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/mrz1836/go-sanitize"
 	"github.com/p-l/fringe/internal/httpd/helpers"
 	"github.com/p-l/fringe/internal/httpd/services"
 )
@@ -26,7 +27,7 @@ func (a *AuthHandler) GoogleCallbackHandler(httpResponse http.ResponseWriter, ht
 	defer func() { _ = httpRequest.Body.Close() }()
 
 	parsedQuery := httpRequest.URL.Query()
-	code := parsedQuery.Get("code")
+	code := sanitize.SingleLine(parsedQuery.Get("code"))
 
 	googleUserInfo, err := a.googleOAuth.AuthenticateUserWithCode(httpRequest.Context(), code)
 	if err != nil {

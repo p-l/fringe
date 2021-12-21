@@ -3,10 +3,10 @@ package handlers
 import (
 	"errors"
 	"fmt"
-	"github.com/mrz1836/go-sanitize"
 	"log"
 	"net/http"
 
+	"github.com/mrz1836/go-sanitize"
 	"github.com/p-l/fringe/internal/httpd/helpers"
 	"github.com/p-l/fringe/internal/repos"
 )
