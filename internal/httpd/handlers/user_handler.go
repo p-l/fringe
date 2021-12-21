@@ -74,12 +74,10 @@ func (u *UserHandler) List(httpResponse http.ResponseWriter, httpRequest *http.R
 	pageQueried := httpRequest.URL.Query().Get("page")
 
 	if len(pageQueried) > 0 {
-		page, err := strconv.ParseInt(pageQueried, 10, 64)
+		pageNumber, err := strconv.Atoi(pageQueried)
 		if err != nil {
-			log.Printf("User/List [%v]: Could not parse page number '%d', defaulting to 0", httpRequest.RemoteAddr, page)
-			page = 0
+			log.Printf("User/List [%v]: Could not parse page number '%d', defaulting to 0", httpRequest.RemoteAddr, pageNumber)
 		}
-		pageNumber = int(page)
 	}
 
 	claims, ok := helpers.AuthClaimsFromContext(httpRequest.Context())
