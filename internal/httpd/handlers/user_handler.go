@@ -3,6 +3,7 @@ package handlers
 import (
 	"errors"
 	"fmt"
+	"github.com/mrz1836/go-sanitize"
 	"log"
 	"net/http"
 	"strconv"
@@ -71,10 +72,11 @@ func (u *UserHandler) List(httpResponse http.ResponseWriter, httpRequest *http.R
 	pageNumber := 0
 
 	pageQueried := httpRequest.URL.Query().Get("page")
+
 	if len(pageQueried) > 0 {
 		page, err := strconv.ParseInt(pageQueried, 10, 64)
 		if err != nil {
-			log.Printf("User/List [%v]: Could not parse page number '%s', defaulting to 0", httpRequest.RemoteAddr, pageQueried)
+			log.Printf("User/List [%v]: Could not parse page number '%d', defaulting to 0", httpRequest.RemoteAddr, page)
 			page = 0
 		}
 		pageNumber = int(page)
@@ -126,7 +128,7 @@ func (u *UserHandler) View(httpResponse http.ResponseWriter, httpRequest *http.R
 
 	claims, _ := helpers.AuthClaimsFromContext(httpRequest.Context())
 	vars := mux.Vars(httpRequest)
-	email := vars["email"]
+	email := sanitize.Email(vars["email"], false)
 
 	if !claimsAllowsForUserPage(claims, email) {
 		log.Printf("User/View [%v]: %s requested %s page without admin rights", httpRequest.RemoteAddr, claims.Email, email)
@@ -158,7 +160,7 @@ func (u *UserHandler) Renew(httpResponse http.ResponseWriter, httpRequest *http.
 
 	claims, _ := helpers.AuthClaimsFromContext(httpRequest.Context())
 	vars := mux.Vars(httpRequest)
-	email := vars["email"]
+	email := sanitize.Email(vars["email"], false)
 
 	if !claimsAllowsForUserPage(claims, email) {
 		log.Printf("User/Renew [%v]: %s cannot renew password for %s", httpRequest.RemoteAddr, claims.Email, email)
@@ -224,7 +226,7 @@ func (u *UserHandler) Enroll(httpResponse http.ResponseWriter, httpRequest *http
 
 	claims, _ := helpers.AuthClaimsFromContext(httpRequest.Context())
 	vars := mux.Vars(httpRequest)
-	email := vars["email"]
+	email := sanitize.Email(vars["email"], false)
 
 	if !claimsAllowsForUserPage(claims, email) {
 		log.Printf("User/Renew [%v]: %s cannot enroll another user (%s)", httpRequest.RemoteAddr, claims.Email, email)
@@ -274,7 +276,7 @@ func (u *UserHandler) Delete(httpResponse http.ResponseWriter, httpRequest *http
 
 	claims, _ := helpers.AuthClaimsFromContext(httpRequest.Context())
 	vars := mux.Vars(httpRequest)
-	email := vars["email"]
+	email := sanitize.Email(vars["email"], false)
 
 	if !claims.IsAdmin() {
 		log.Printf("User/Delete [%v]: %s attempted to delete user %s without permission", httpRequest.RemoteAddr, claims.Email, email)

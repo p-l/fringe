@@ -3,6 +3,7 @@ package handlers
 import (
 	"errors"
 	"fmt"
+	"github.com/mrz1836/go-sanitize"
 	"log"
 	"net/http"
 
@@ -65,7 +66,8 @@ func (u *DefaultHandler) Root(httpResponse http.ResponseWriter, httpRequest *htt
 
 func (u *DefaultHandler) NotFound(httpResponse http.ResponseWriter, httpRequest *http.Request) {
 	path := httpRequest.URL.Path
-	log.Printf("Home/404 [%v]: %s", httpRequest.RemoteAddr, path)
+
+	log.Printf("Home/404 [%v]: %s", httpRequest.RemoteAddr, sanitize.PathName(path))
 
 	err := u.PageHelper.RenderPage(httpResponse, "default/404.gohtml", NotFoundTemplateData{Path: path})
 	if err != nil {
