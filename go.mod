@@ -5,10 +5,11 @@ go 1.17
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/alexedwards/argon2id v0.0.0-20211130144151-3585854a6387
-	github.com/dchest/uniuri v0.0.0-20200228104902-7aecb25e1fe5
 	github.com/golang-jwt/jwt v3.2.2+incompatible
+	github.com/gorilla/mux v1.8.0
 	github.com/jaswdr/faker v1.8.0
 	github.com/jmoiron/sqlx v1.3.4
+	github.com/sethvargo/go-password v0.2.0
 	github.com/spf13/viper v1.9.0
 	github.com/stretchr/testify v1.7.0
 	layeh.com/radius v0.0.0-20210819152912-ad72663a72ab
@@ -22,6 +23,7 @@ require (
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/magiconair/properties v1.8.5 // indirect
 	github.com/mitchellh/mapstructure v1.4.2 // indirect
+	github.com/mrz1836/go-sanitize v1.1.5 // indirect
 	github.com/pelletier/go-toml v1.9.4 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20200410134404-eec4a21b6bb0 // indirect

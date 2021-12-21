@@ -3,7 +3,7 @@
 ![ci workflow](https://github.com/p-l/fringe/actions/workflows/ci.yml/badge.svg)
 ![codeql workflow](https://github.com/p-l/fringe/actions/workflows/codeql-analysis.yml/badge.svg)
 
-**Fringe** is an easy workaround for Google Workplace users who need a Radius server to perform authentication on behalf of
+**Fringe** is an easy workaround for Google Workspace users who need a Radius server to perform authentication on behalf of
 other services (e.g. 802.1X Wi-Fi, vpn server). 
 
 The fringe service offers both a http and radius server. 

@@ -1,0 +1,87 @@
+{{ template "default" . }}
+{{ define "title" }}Users{{ end }}
+{{ define "head" }}
+    <script>
+        function deleteUser(email) {
+            // TODO: Move text to messages
+            let navigate = confirm("Delete " + email + "'s user record?")
+            if (navigate) {
+                window.location.href = "/user/" + email + "/delete";
+            }
+        }
+
+        function newPasswordForUser(email) {
+            let navigate = confirm("Create a new password for " + email + "?")
+            if (navigate) {
+                window.location.href = "/user/" + email + "/password";
+            }
+        }
+
+        function newUserPressed() {
+            let input = document.getElementById('new-user');
+            let email = input.value;
+            let validationRegex = /^[a-zA-Z0-9_+&*-]+(?:\.[a-zA-Z0-9_+&*-]+)*@(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,7}$/
+
+            if(!validationRegex.test(email)) {
+                // TODO: Move to messages
+                alert('Invalid email Address');
+                return;
+            }
+
+            window.location.href = "/user/" + email + "/enroll";
+        }
+    </script>
+{{ end }}
+
+{{ define "content"}}
+    <div class="top-containers">
+        <div class="card">
+            <div class="line">
+                <input id="new-user" name="email" type="email" placeholder="create user" value="">
+                <button aria-label="new" id="add-user" class="dark-button small-button" type="submit" onclick="newUserPressed();">
+                    <i data-feather="plus"></i>
+                </button>
+                <script>
+                    document.getElementById('new-user').addEventListener("keydown", function (e) { if (e.key === "Enter") { newUserPressed(); }})
+                </script>
+            </div>
+        </div>
+        <div class="card">
+            {{ $userLen := len .Users }}
+            {{ range $index, $user := .Users }}
+                {{ $cornersClass := "" }}
+                {{ if eq 0 $index }}{{ $cornersClass = "top-corner" }}{{ end }}
+                {{ if and $.LastPage (last $index $.Users) }}{{ $cornersClass = printf "%s %s" $cornersClass "bottom-corner" }}{{ end }}
+                <div class="line {{ $cornersClass }}"
+                     style="display: flex; align-items: center; border: 1px solid #dadce0;">
+                    <div style="margin-left:10px; width:100%; align-items: center;">
+                        <p style="margin:0; padding: 0; height:21px; width:100%; font-size: 12pt; vertical-align: bottom; letter-spacing: 0.015em; line-height: 1.4em;">{{ .Email }}</p>
+                        <p style="margin:0; padding: 0; height:13px; width:100%; font-size: 8pt; vertical-align: top; color:gray; line-height: 0.8em;">{{ unix_date_string .LastSeenAt }}</p>
+                    </div>
+                    <button aria-label="delete" id="" class="red-button" style="width:50px;" onclick="deleteUser('{{ .Email }}');">
+                        <i data-feather="trash-2"></i>
+                    </button>
+                    <button aria-label="copy" id="password" class="blue-button" style="width:50px;"
+                            onclick="newPasswordForUser('{{ .Email }}');">
+                        <i data-feather="key"></i>
+                    </button>
+                </div>
+            {{ end }}
+        </div>
+        {{ if or (not .LastPage) (not .FirstPage) }}
+            <div class="card">
+                <div class="line" style="display: flex; align-items: center; ">
+                    {{ if not .FirstPage }}
+                        <button aria-label="back" id="previous-button" class="big-button dark-button" type="submit">
+                            <i data-feather="chevrons-left"></i>
+                        </button>
+                    {{ end }}
+                    {{ if not .LastPage }}
+                        <button aria-label="back" id="next-button" class="big-button dark-button" type="submit">
+                            <i data-feather="chevrons-right"></i>
+                        </button>
+                    {{ end }}
+                </div>
+            </div>
+        {{ end }}
+{{ end }}

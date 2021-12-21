@@ -1,0 +1,16 @@
+{{ template "default" . }}
+{{ define "title" }}404 page not found{{ end }}
+{{ define "head" }}{{ end }}
+
+{{ define "content"}}
+<div class="center-containers">
+    <div style="display: flex; align-items: center;">
+
+        <i data-feather="alert-circle"></i>
+        <span style="font-size: 14pt; letter-spacing: 0.015em; padding-left: 6px;">Page Not Found</span>
+    </div>
+    <div style="padding-top:6px;">
+        <span style=" font-size: 11pt; font-weight: lighter; color: dimgray">{{ .Path }}</span>
+    </div>
+</div>
+{{ end }}

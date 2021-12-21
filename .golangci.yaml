@@ -24,7 +24,21 @@ linters:
     - noctx
     - scopelint
 
+issues:
+   exclude-rules:
+     - path: _test\.go
+       linters:
+         - bodyclose
+         - dupl
+         - funlen
+         - gosec
+
 linters-settings:
+  gomnd:
+    settings:
+      mnd:
+        ignored-functions: math.*,strconv.*
+
   ireturn:
     # ireturn allows using `allow` and `reject` settings at the same time.
     # Both settings are lists of the keywords and regular expressions matched to interface or package names.
