@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/mrz1836/go-sanitize"
 	"github.com/p-l/fringe/internal/httpd/helpers"
 )
 
@@ -30,7 +31,7 @@ func (a *AuthMiddleware) EnsureAuth(next http.Handler) http.Handler {
 		// Skip auth validation for excluded path
 		for _, path := range a.ExcludedPaths {
 			if strings.HasPrefix(uri.Path, path) {
-				log.Printf("Auth [src:%v] %s matches excluded path %s, skipping auth", httpRequest.RemoteAddr, uri.Path, path)
+				log.Printf("Auth [src:%v] %s matches excluded path %s, skipping auth", httpRequest.RemoteAddr, sanitize.PathName(uri.Path), sanitize.PathName(path))
 				next.ServeHTTP(httpResponse, httpRequest)
 
 				return

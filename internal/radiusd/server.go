@@ -3,6 +3,7 @@ package radiusd
 import (
 	"log"
 
+	"github.com/mrz1836/go-sanitize"
 	"github.com/p-l/fringe/internal/repos"
 	"layeh.com/radius"
 	"layeh.com/radius/rfc2865"
@@ -11,8 +12,8 @@ import (
 // NewRadiusServer Creates and configure the Radius Server.
 func NewRadiusServer(repo *repos.UserRepository, secret string) *radius.PacketServer {
 	handler := func(writer radius.ResponseWriter, request *radius.Request) {
-		username := rfc2865.UserName_GetString(request.Packet)
-		password := rfc2865.UserPassword_GetString(request.Packet)
+		username := sanitize.Email(rfc2865.UserName_GetString(request.Packet), false)
+		password := sanitize.SingleLine(rfc2865.UserPassword_GetString(request.Packet))
 		code := radius.CodeAccessReject
 
 		log.Printf("Radius request for %s from %v", username, request.RemoteAddr)

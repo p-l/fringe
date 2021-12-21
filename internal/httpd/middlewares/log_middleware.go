@@ -1,6 +1,7 @@
 package middlewares
 
 import (
+	"github.com/mrz1836/go-sanitize"
 	"log"
 	"net/http"
 	"net/url"
@@ -31,7 +32,7 @@ func (u *LogMiddleware) LogRequests(next http.Handler) http.Handler {
 		}
 		requestURL.RawQuery = urlQuery.Encode()
 
-		log.Printf("%s %v [src:%v]", httpRequest.Method, requestURL, httpRequest.RemoteAddr)
+		log.Printf("%s %v [src:%v]", httpRequest.Method, sanitize.URL(requestURL.String()), httpRequest.RemoteAddr)
 		// Call the next handlers, which can be another middlewares in the chain, or the final handlers.
 		next.ServeHTTP(httpResponse, httpRequest)
 	})
