@@ -1,10 +1,11 @@
 package middlewares
 
 import (
-	"github.com/mrz1836/go-sanitize"
 	"log"
 	"net/http"
 	"net/url"
+
+	"github.com/mrz1836/go-sanitize"
 )
 
 type LogMiddleware struct{}
