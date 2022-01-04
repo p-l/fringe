@@ -1,10 +1,10 @@
 [fringe]
 # Limit users accepted with email from this domain
 # allowed-domain = "yourdomain.com"
-
+#
 # Secret used to protect the JWT used after authentication.
 # secret = "<SOME RANDOME SECRET STRING>"
-
+#
 # Administration function are enabled for users with these emails
 # admin-emails = ["you@yourdomain.com"]
 
@@ -16,10 +16,21 @@
 # Set a radius secret to be share between client and server should be a different secret from the fringe secret
 # secret = "<SOME RANDOM SECRET STRING>"
 
-[http]
-# Fringe must be behind an ngnix reverse proxy with TLS enabled (using https://letsencrypt.org is probably the easiest)
-# Set what root url should be used for HTTP redirect.
-# root-url = "https://fringe.yourdomain.com"
+[web]
+# Set the publicly visible domain name for the web server
+# domain = "fringe.mydomain.com"
+#
+# Automatically get TLS server certification using https://letsencrypt.org
+# lets-encrypt = true
+#
+# Specify the location of the certificate (when lets-encrypt = false)
+# tls-cert-file = "certs/server.crt"
+# tls-key-file = "certs/server.key"
+#
+# Specify where the HTTP and HTTPS server listen for incoming connection. You can restrict to a specific adaptor
+# by specifying its IP address at the begining (ex: "127.0.0.1:80" or "10.0.0.1:443")
+# http-bind-address = ":80"
+# https-bind-address = ":443"
 
 [google-oauth]
 # You must create an OAuth application in the Google Developer Console
@@ -31,10 +42,10 @@
 
 [texts.password]
 # Fringe does not support multiple language just yet. Until then, you can alter and insert text using configuration
-
+#
 # Set a hint line under the password field (empty by default)
 # hint = "Save this password"
-
+#
 # Add an info panel under password field to let users know where to use it. Title is the first line followed by
 # a list of items in an array (empty by default)
 # info-title = "Where to use"

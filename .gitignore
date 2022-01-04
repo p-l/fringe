@@ -34,3 +34,6 @@ vendor/
 
 # Development databases
 /db/
+
+# Development Certs
+/certs/

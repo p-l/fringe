@@ -21,11 +21,11 @@ type Texts struct {
 	PasswordInfoCardItems []string
 }
 
-const httpTimeouts = time.Second * 5
+const httpsTimeouts = time.Second * 5
 
 // NewHTTPServer Create and configure the HTTP server.
-func NewHTTPServer(repo *repos.UserRepository, templates fs.FS, assets fs.FS, rootURL string, adminEmails []string, googleClientID string, googleClientSecret string, allowedDomain string, jwtSecret string, texts Texts) *http.Server {
-	googleOAuth := services.NewGoogleOAuthService(http.DefaultClient, googleClientID, googleClientSecret, fmt.Sprintf("%s/auth/google/callback", rootURL))
+func NewHTTPServer(repo *repos.UserRepository, templates fs.FS, assets fs.FS, bindAddress string, serverDomain string, adminEmails []string, googleClientID string, googleClientSecret string, allowedDomain string, jwtSecret string, texts Texts) *http.Server {
+	googleOAuth := services.NewGoogleOAuthService(http.DefaultClient, googleClientID, googleClientSecret, fmt.Sprintf("https://%s/auth/google/callback", serverDomain))
 
 	authHelper := helpers.NewAuthHelper(allowedDomain, jwtSecret, adminEmails)
 	pageHelper := helpers.NewPageHelper(templates)
@@ -54,13 +54,13 @@ func NewHTTPServer(repo *repos.UserRepository, templates fs.FS, assets fs.FS, ro
 	router.NotFoundHandler = http.HandlerFunc(homeHandler.NotFound)
 	http.Handle("/", router)
 
-	log.Printf("Created httpd server on :9990")
+	log.Printf("Created httpd server on %s", bindAddress)
 	httpd := http.Server{
 		Handler:      router,
-		Addr:         "127.0.0.1:9990",
-		WriteTimeout: httpTimeouts,
-		ReadTimeout:  httpTimeouts,
-		IdleTimeout:  httpTimeouts,
+		Addr:         bindAddress,
+		WriteTimeout: httpsTimeouts,
+		ReadTimeout:  httpsTimeouts,
+		IdleTimeout:  httpsTimeouts,
 	}
 
 	return &httpd
