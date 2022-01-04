@@ -67,7 +67,7 @@ func (u *DefaultHandler) Root(httpResponse http.ResponseWriter, httpRequest *htt
 func (u *DefaultHandler) NotFound(httpResponse http.ResponseWriter, httpRequest *http.Request) {
 	path := httpRequest.URL.Path
 
-	log.Printf("Home/404 [%v]: %s", httpRequest.RemoteAddr, sanitize.PathName(path))
+	log.Printf("Home/404 [%v]: %s", httpRequest.RemoteAddr, sanitize.URL(path))
 
 	err := u.PageHelper.RenderPage(httpResponse, "default/404.gohtml", NotFoundTemplateData{Path: path})
 	if err != nil {
