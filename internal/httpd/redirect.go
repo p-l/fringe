@@ -2,11 +2,11 @@ package httpd
 
 import (
 	"fmt"
-	"github.com/mrz1836/go-sanitize"
 	"log"
 	"net/http"
 	"time"
 
+	"github.com/mrz1836/go-sanitize"
 	"github.com/p-l/fringe/internal/httpd/middlewares"
 	"golang.org/x/crypto/acme/autocert"
 )
