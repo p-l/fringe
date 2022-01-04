@@ -25,6 +25,8 @@ import (
 	"modernc.org/ql"
 )
 
+const terminationWait = time.Second * 5
+
 func loadConfigFile() {
 	viper.SetConfigName("config")       // name of config file (without extension)
 	viper.SetConfigType("toml")         // REQUIRED if the config file does not have the extension in the name
@@ -60,6 +62,40 @@ func fatalOnInvalidConfig() {
 			log.Panicf("missing configuration key %s under section %s in configuration file", entries[1], entries[0])
 		}
 	}
+
+	if !viper.GetBool("web.lets-encrypt") {
+		tlsCertFile := viper.GetString("web.tls-cert-file")
+		tlsKeyFile := viper.GetString("web.tls-key-file")
+
+		if _, err := os.Stat(tlsCertFile); errors.Is(err, os.ErrNotExist) {
+			log.Panicf("lets-encrypt is turned off and the tls-cert-file (%s) is not found", tlsCertFile)
+		}
+
+		if _, err := os.Stat(tlsKeyFile); errors.Is(err, os.ErrNotExist) {
+			log.Panicf("lets-encrypt is turned off and the tls-key-file (%s) is not found", tlsKeyFile)
+		}
+	}
+}
+
+func openDB() *sqlx.DB {
+	// Initialize Database connexion
+	ql.RegisterDriver()
+
+	db, err := sqlx.Open("ql", viper.GetString("database.location"))
+	if err != nil {
+		log.Panicf("could not connect to database: %v", err)
+	}
+
+	return db
+}
+
+func openUserRepo(connexion *sqlx.DB) *repos.UserRepository {
+	userRepo, err := repos.NewUserRepository(connexion)
+	if err != nil {
+		log.Panicf("could not initate user repository: %v", err)
+	}
+
+	return userRepo
 }
 
 func httpSrvTextsFromConfig() httpd.Texts {
@@ -70,35 +106,7 @@ func httpSrvTextsFromConfig() httpd.Texts {
 	}
 }
 
-const terminationWait = time.Second * 5
-
-func main() {
-	// Load and validate configuration
-	loadConfigFile()
-	fatalOnInvalidConfig()
-
-	// Initialize Database connexion
-	ql.RegisterDriver()
-
-	connexion, err := sqlx.Open("ql", viper.GetString("database.location"))
-	if err != nil {
-		log.Panicf("could not connect to database: %v", err)
-	}
-
-	userRepo, err := repos.NewUserRepository(connexion)
-	if err != nil {
-		log.Panicf("could not initate user repository: %v", err)
-	}
-
-	// Get Radius Started
-	radiusSrv := radiusd.NewRadiusServer(userRepo, viper.GetString("radius.secret"))
-
-	go func() {
-		if err := radiusSrv.ListenAndServe(); err != nil {
-			log.Panicf("radius server died with error: %v", err)
-		}
-	}()
-
+func newWebServers(userRepo *repos.UserRepository) (*http.Server, *http.Server) {
 	staticTemplates := fs.FS(templates.Files())
 	staticAssets := fs.FS(assets.Files())
 	httpSrvTexts := httpSrvTextsFromConfig()
@@ -119,8 +127,9 @@ func main() {
 
 	// TLS Cert Manager
 	var certManager *autocert.Manager
-	tlsCertFile := viper.GetString("web.tls-cert-file")
-	tlsKeyFile := viper.GetString("web.tls-key-file")
+	tlsConfig := tls.Config{
+		MinVersion: tls.VersionTLS12,
+	}
 
 	if viper.GetBool("web.lets-encrypt") {
 		certManager = &autocert.Manager{
@@ -128,30 +137,11 @@ func main() {
 			HostPolicy: autocert.HostWhitelist(viper.GetString("web.domain")),
 			Cache:      autocert.DirCache("certs"),
 		}
-		// Splice-in certificate manager to the https server
-		httpsSrv.TLSConfig = &tls.Config{
-			MinVersion:     tls.VersionTLS12,
-			GetCertificate: certManager.GetCertificate,
-		}
-	} else {
-		// Only force MinVersion to TLS 1.2
-		httpsSrv.TLSConfig = &tls.Config{
-			MinVersion: tls.VersionTLS12,
-		}
-		if _, err := os.Stat(tlsCertFile); errors.Is(err, os.ErrNotExist) {
-			log.Panicf("lets-encrypt is turned off and the tls-cert-file (%s) is not found", tlsCertFile)
-		}
-		if _, err := os.Stat(tlsKeyFile); errors.Is(err, os.ErrNotExist) {
-			log.Panicf("lets-encrypt is turned off and the tls-key-file (%s) is not found", tlsKeyFile)
-		}
+		tlsConfig.GetCertificate = certManager.GetCertificate
 	}
 
-	// Start the https server
-	go func() {
-		if err := httpsSrv.ListenAndServeTLS(tlsCertFile, tlsKeyFile); err != nil {
-			log.Panicf("web server (https) died with error: %v", err)
-		}
-	}()
+	// Add the TLS configuration to the https server
+	httpsSrv.TLSConfig = &tlsConfig
 
 	// HTTP to HTTPS Redirection and autocert server
 	redirectSrv := httpd.NewRedirectServer(
@@ -159,13 +149,43 @@ func main() {
 		viper.GetString("web.domain"),
 		certManager)
 
+	return httpsSrv, redirectSrv
+}
+
+func main() {
+	// Load and validate configuration
+	loadConfigFile()
+	fatalOnInvalidConfig()
+
+	db := openDB()
+	userRepo := openUserRepo(db)
+
+	// Servers
+	radiusSrv := radiusd.NewRadiusServer(userRepo, viper.GetString("radius.secret"))
+	httpsSrv, redirectSrv := newWebServers(userRepo)
+
+	// Start Radius
+	go func() {
+		if err := radiusSrv.ListenAndServe(); err != nil {
+			log.Panicf("radius server died with error: %v", err)
+		}
+	}()
+
+	// Start HTTPS
+	go func() {
+		if err := httpsSrv.ListenAndServeTLS(viper.GetString("web.tls-cert-file"), viper.GetString("web.tls-key-file")); err != nil {
+			log.Panicf("web server (https) died with error: %v", err)
+		}
+	}()
+
+	// Start HTTP
 	go func() {
 		if err := redirectSrv.ListenAndServe(); err != nil {
 			log.Panicf("web redirect server (http) died with error: %v", err)
 		}
 	}()
 
-	waitOn(httpsSrv, redirectSrv, radiusSrv, connexion)
+	waitOn(httpsSrv, redirectSrv, radiusSrv, db)
 }
 
 func waitOn(httpSrv *http.Server, redirectSrv *http.Server, radiusSrv *radius.PacketServer, connexion *sqlx.DB) {
