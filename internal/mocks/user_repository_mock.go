@@ -10,7 +10,7 @@ import (
 	"modernc.org/ql"
 )
 
-// NewMockUserRepository returns an actual repos.UserRepository setup with fake data in a temporary directory.
+// NewMockUserRepository returns an actual repos.UserRepository system with fake data in a temporary directory.
 func NewMockUserRepository(t *testing.T) *repos.UserRepository {
 	t.Helper()
 

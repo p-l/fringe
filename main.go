@@ -3,13 +3,11 @@ package main
 import (
 	"context"
 	"crypto/tls"
-	"errors"
 	"io/fs"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
@@ -18,8 +16,8 @@ import (
 	"github.com/p-l/fringe/internal/httpd"
 	"github.com/p-l/fringe/internal/radiusd"
 	"github.com/p-l/fringe/internal/repos"
+	"github.com/p-l/fringe/internal/system"
 	"github.com/p-l/fringe/templates"
-	"github.com/spf13/viper"
 	"golang.org/x/crypto/acme/autocert"
 	"layeh.com/radius"
 	"modernc.org/ql"
@@ -27,61 +25,11 @@ import (
 
 const terminationWait = time.Second * 5
 
-func loadConfigFile() {
-	viper.SetConfigName("config")       // name of config file (without extension)
-	viper.SetConfigType("toml")         // REQUIRED if the config file does not have the extension in the name
-	viper.AddConfigPath("/etc/fringe/") // path to look for the config file in
-	viper.AddConfigPath(".")            // optionally look for config in the working directory
-
-	// Default values
-	viper.SetDefault("web.http-bind-address", ":80")
-	viper.SetDefault("web.https-bind-address", ":443")
-	viper.SetDefault("web.http-redirect", false)
-	viper.SetDefault("web.domain", "127.0.0.1")
-	viper.SetDefault("web.use-letsencrypt", true)
-	viper.SetDefault("database.location", "/var/lib/fringe/users.repos")
-
-	// Read the configuration
-	if err := viper.ReadInConfig(); err != nil {
-		log.Panicf("config file error: %v", err)
-	}
-}
-
-func fatalOnInvalidConfig() {
-	criticalKeys := []string{
-		"fringe.allowed-domain",
-		"fringe.secret",
-		"radius.secret",
-		"google-oauth.client-id",
-		"google-oauth.client-secret",
-	}
-
-	for _, key := range criticalKeys {
-		if len(viper.GetString(key)) == 0 {
-			entries := strings.Split(key, ".")
-			log.Panicf("missing configuration key %s under section %s in configuration file", entries[1], entries[0])
-		}
-	}
-
-	if !viper.GetBool("web.lets-encrypt") {
-		tlsCertFile := viper.GetString("web.tls-cert-file")
-		tlsKeyFile := viper.GetString("web.tls-key-file")
-
-		if _, err := os.Stat(tlsCertFile); errors.Is(err, os.ErrNotExist) {
-			log.Panicf("lets-encrypt is turned off and the tls-cert-file (%s) is not found", tlsCertFile)
-		}
-
-		if _, err := os.Stat(tlsKeyFile); errors.Is(err, os.ErrNotExist) {
-			log.Panicf("lets-encrypt is turned off and the tls-key-file (%s) is not found", tlsKeyFile)
-		}
-	}
-}
-
-func openDB() *sqlx.DB {
+func openDB(databaseFile string) *sqlx.DB {
 	// Initialize Database connexion
 	ql.RegisterDriver()
 
-	db, err := sqlx.Open("ql", viper.GetString("database.location"))
+	db, err := sqlx.Open("ql", databaseFile)
 	if err != nil {
 		log.Panicf("could not connect to database: %v", err)
 	}
@@ -98,55 +46,44 @@ func openUserRepo(connexion *sqlx.DB) *repos.UserRepository {
 	return userRepo
 }
 
-func httpSrvTextsFromConfig() httpd.Texts {
-	return httpd.Texts{
-		PasswordHint:          viper.GetString("texts.password.hint"),
-		PasswordInfoCardTitle: viper.GetString("texts.password.info-title"),
-		PasswordInfoCardItems: viper.GetStringSlice("texts.password.info-items"),
-	}
-}
-
-func newWebServers(userRepo *repos.UserRepository) (*http.Server, *http.Server) {
+func newWebServers(config system.Config, userRepo *repos.UserRepository, jwtSecret string) (*http.Server, *http.Server) {
 	staticTemplates := fs.FS(templates.Files())
 	staticAssets := fs.FS(assets.Files())
-	httpSrvTexts := httpSrvTextsFromConfig()
 
 	// HTTPS
 	httpsSrv := httpd.NewHTTPServer(
+		config,
 		userRepo,
 		staticTemplates,
 		staticAssets,
-		viper.GetString("web.https-bind-address"),
-		viper.GetString("web.domain"),
-		viper.GetStringSlice("fringe.admin-emails"),
-		viper.GetString("google-oauth.client-id"),
-		viper.GetString("google-oauth.client-secret"),
-		viper.GetString("fringe.allowed-domain"),
-		viper.GetString("fringe.secret"),
-		httpSrvTexts)
+		jwtSecret)
 
 	// TLS Cert Manager
 	var certManager *autocert.Manager
-	tlsConfig := tls.Config{
-		MinVersion: tls.VersionTLS12,
-	}
 
-	if viper.GetBool("web.lets-encrypt") {
+	var tlsConfig *tls.Config
+
+	if config.Web.UseLetsEncrypt {
 		certManager = &autocert.Manager{
 			Prompt:     autocert.AcceptTOS,
-			HostPolicy: autocert.HostWhitelist(viper.GetString("web.domain")),
+			HostPolicy: autocert.HostWhitelist(config.Web.Domain),
 			Cache:      autocert.DirCache("certs"),
 		}
-		tlsConfig.GetCertificate = certManager.GetCertificate
+		tlsConfig = &tls.Config{
+			GetCertificate: certManager.GetCertificate,
+			MinVersion:     tls.VersionTLS12,
+		}
+	} else {
+		tlsConfig = system.TLSConfigWithSelfSignedCert(system.AllLocalIPAddresses())
 	}
 
 	// Add the TLS configuration to the https server
-	httpsSrv.TLSConfig = &tlsConfig
+	httpsSrv.TLSConfig = tlsConfig
 
 	// HTTP to HTTPS Redirection and autocert server
 	redirectSrv := httpd.NewRedirectServer(
-		viper.GetString("web.http-bind-address"),
-		viper.GetString("web.domain"),
+		config.Services.HTTPBindAddress,
+		config.Web.Domain,
 		certManager)
 
 	return httpsSrv, redirectSrv
@@ -154,15 +91,15 @@ func newWebServers(userRepo *repos.UserRepository) (*http.Server, *http.Server) 
 
 func main() {
 	// Load and validate configuration
-	loadConfigFile()
-	fatalOnInvalidConfig()
+	config := system.LoadConfig()
+	secrets := system.LoadSecretsFromFile(config.Storage.SecretsFile)
 
-	db := openDB()
+	db := openDB(config.Storage.UserDatabaseFile)
 	userRepo := openUserRepo(db)
 
 	// Servers
-	radiusSrv := radiusd.NewRadiusServer(userRepo, viper.GetString("radius.secret"))
-	httpsSrv, redirectSrv := newWebServers(userRepo)
+	radiusSrv := radiusd.NewRadiusServer(userRepo, secrets.Radius)
+	httpsSrv, redirectSrv := newWebServers(config, userRepo, secrets.JWT)
 
 	// Start Radius
 	go func() {
@@ -173,7 +110,7 @@ func main() {
 
 	// Start HTTPS
 	go func() {
-		if err := httpsSrv.ListenAndServeTLS(viper.GetString("web.tls-cert-file"), viper.GetString("web.tls-key-file")); err != nil {
+		if err := httpsSrv.ListenAndServeTLS("", ""); err != nil {
 			log.Panicf("web server (https) died with error: %v", err)
 		}
 	}()

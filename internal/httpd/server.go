@@ -13,6 +13,7 @@ import (
 	"github.com/p-l/fringe/internal/httpd/middlewares"
 	"github.com/p-l/fringe/internal/httpd/services"
 	"github.com/p-l/fringe/internal/repos"
+	"github.com/p-l/fringe/internal/system"
 )
 
 type Texts struct {
@@ -24,10 +25,10 @@ type Texts struct {
 const httpsTimeouts = time.Second * 5
 
 // NewHTTPServer Create and configure the HTTP server.
-func NewHTTPServer(repo *repos.UserRepository, templates fs.FS, assets fs.FS, bindAddress string, serverDomain string, adminEmails []string, googleClientID string, googleClientSecret string, allowedDomain string, jwtSecret string, texts Texts) *http.Server {
-	googleOAuth := services.NewGoogleOAuthService(http.DefaultClient, googleClientID, googleClientSecret, fmt.Sprintf("https://%s/auth/google/callback", serverDomain))
+func NewHTTPServer(config system.Config, repo *repos.UserRepository, templates fs.FS, assets fs.FS, jwtSecret string) *http.Server {
+	googleOAuth := services.NewGoogleOAuthService(http.DefaultClient, config.OAuth.Google.ClientID, config.OAuth.Google.ClientSecret, fmt.Sprintf("https://%s/auth/google/callback", config.Web.Domain))
 
-	authHelper := helpers.NewAuthHelper(allowedDomain, jwtSecret, adminEmails)
+	authHelper := helpers.NewAuthHelper(config.Security.AllowedDomain, jwtSecret, config.Security.AuthorizedAdminEmails)
 	pageHelper := helpers.NewPageHelper(templates)
 
 	logMiddleware := middlewares.NewLogMiddleware()
@@ -35,7 +36,7 @@ func NewHTTPServer(repo *repos.UserRepository, templates fs.FS, assets fs.FS, bi
 
 	homeHandler := handlers.NewDefaultHandler(repo, pageHelper)
 	authHandler := handlers.NewAuthHandler(googleOAuth, authHelper)
-	userHandler := handlers.NewUserHandler(repo, authHelper, pageHelper, texts.PasswordHint, texts.PasswordInfoCardTitle, texts.PasswordInfoCardItems)
+	userHandler := handlers.NewUserHandler(repo, authHelper, pageHelper)
 
 	router := mux.NewRouter()
 	router.Use(logMiddleware.LogRequests)
@@ -54,10 +55,10 @@ func NewHTTPServer(repo *repos.UserRepository, templates fs.FS, assets fs.FS, bi
 	router.NotFoundHandler = http.HandlerFunc(homeHandler.NotFound)
 	http.Handle("/", router)
 
-	log.Printf("Created httpd server on %s", bindAddress)
+	log.Printf("Created httpd server on %s", config.Services.HTTPSBindAddress)
 	httpd := http.Server{
 		Handler:      router,
-		Addr:         bindAddress,
+		Addr:         config.Services.HTTPSBindAddress,
 		WriteTimeout: httpsTimeouts,
 		ReadTimeout:  httpsTimeouts,
 		IdleTimeout:  httpsTimeouts,

@@ -64,10 +64,6 @@ run-air:
 	@echo "Running air (https://github.com/cosmtrek/air)"
 	air
 
-dev-cert:
-	mkdir -p $(CERT_DIR)
-	openssl req -x509 -newkey rsa:4096 -sha256 -days 3650 -nodes -keyout $(CERT_DIR)/server.key -out $(CERT_DIR)/server.crt -subj "/CN=fringe.local" -addext "subjectAltName=DNS:fringe.local,DNS:www.fringe.local,IP:127.0.0.1"
-
 .PHONY: version
 version:
 	@echo "$(VERSION)"

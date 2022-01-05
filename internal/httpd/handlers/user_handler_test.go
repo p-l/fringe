@@ -36,7 +36,7 @@ func createUserHandler(t *testing.T) (*handlers.UserHandler, *repos.UserReposito
 	authHelper := helpers.NewAuthHelper("test.com", "secret", []string{})
 	pageHelper := helpers.NewPageHelper(templates.Files())
 
-	userHandler := handlers.NewUserHandler(userRepo, authHelper, pageHelper, "", "", []string{})
+	userHandler := handlers.NewUserHandler(userRepo, authHelper, pageHelper)
 
 	return userHandler, userRepo
 }

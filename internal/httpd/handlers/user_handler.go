@@ -16,20 +16,14 @@ import (
 )
 
 type UserHandler struct {
-	userRepo     *repos.UserRepository
-	authHelper   *helpers.AuthHelper
-	pageHelper   *helpers.PageHelper
-	passwordHint string
-	infoTitle    string
-	infoItems    []string
+	userRepo   *repos.UserRepository
+	authHelper *helpers.AuthHelper
+	pageHelper *helpers.PageHelper
 }
 
 type UserViewTemplateData struct {
 	Email            string
 	Password         string
-	PasswordHint     string
-	InfoTitle        string
-	InfoItems        []string
 	ShowUserListLink bool
 }
 
@@ -46,14 +40,11 @@ const (
 	newUserPasswordNumOfSymbols = 2
 )
 
-func NewUserHandler(userRepo *repos.UserRepository, authHelper *helpers.AuthHelper, pageHelper *helpers.PageHelper, paaswordHint string, infoTitle string, infoItems []string) *UserHandler {
+func NewUserHandler(userRepo *repos.UserRepository, authHelper *helpers.AuthHelper, pageHelper *helpers.PageHelper) *UserHandler {
 	return &UserHandler{
-		userRepo:     userRepo,
-		authHelper:   authHelper,
-		pageHelper:   pageHelper,
-		passwordHint: paaswordHint,
-		infoTitle:    infoTitle,
-		infoItems:    infoItems,
+		userRepo:   userRepo,
+		authHelper: authHelper,
+		pageHelper: pageHelper,
 	}
 }
 
@@ -137,9 +128,6 @@ func (u *UserHandler) View(httpResponse http.ResponseWriter, httpRequest *http.R
 
 	data := UserViewTemplateData{
 		Email:            email,
-		PasswordHint:     u.passwordHint,
-		InfoTitle:        u.infoTitle,
-		InfoItems:        u.infoItems,
 		ShowUserListLink: claims.IsAdmin(),
 	}
 
@@ -201,9 +189,6 @@ func (u *UserHandler) renderPasswordPage(httpResponse http.ResponseWriter, httpR
 	data := UserViewTemplateData{
 		Email:            email,
 		Password:         password,
-		PasswordHint:     u.passwordHint,
-		InfoTitle:        u.infoTitle,
-		InfoItems:        u.infoItems,
 		ShowUserListLink: claims.IsAdmin(),
 	}
 

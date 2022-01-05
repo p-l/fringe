@@ -18,21 +18,6 @@
         </div>
         </form>
 
-        {{ if and .InfoTitle .InfoItems  }}
-        <div class="card info-card">
-            <div class="line title" style="">
-                <h4>{{ .InfoTitle }}</h4>
-            </div>
-            <div class="line">
-                <ul>
-                    {{ range .InfoItems }}
-                    <li>{{ . }}</li>
-                    {{ end }}
-                </ul>
-            </div>
-        </div>
-        {{ end }}
-
         {{ if .ShowUserListLink  }}
         <div class="card">
             <form method="get" action="/user/">
