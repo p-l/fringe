@@ -35,9 +35,8 @@ EOF
 }
 
 function init_config {
-    mkdir -p $(dirname ${FRINGE_CONFIG_PATH})
+    mkdir -p "$(dirname ${FRINGE_CONFIG_PATH})"
 
-    local config_path=${FRINGE_CONFIG_PATH}
     local config_path=${FRINGE_CONFIG_PATH}
     if [[ -s ${config_path} ]]; then
         config_path=${FRINGE_CONFIG_PATH}.defaults
