@@ -1,8 +1,9 @@
 #!/bin/bash -e
+PIDFile=/var/lib/fringe/fringe.pid
 
 /usr/bin/fringe &
 PID=$!
-echo $PID > /var/lib/fringe/finge.pid
+echo ${PID} > ${PIDFile}
 
 set +e
 #attempts=0
