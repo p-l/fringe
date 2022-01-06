@@ -18,6 +18,7 @@ import (
 	"github.com/p-l/fringe/internal/repos"
 	"github.com/p-l/fringe/internal/system"
 	"github.com/p-l/fringe/templates"
+	"github.com/spf13/viper"
 	"golang.org/x/crypto/acme/autocert"
 	"layeh.com/radius"
 	"modernc.org/ql"
@@ -91,9 +92,17 @@ func newWebServers(config system.Config, userRepo *repos.UserRepository, jwtSecr
 
 func main() {
 	// Load and validate configuration
-	config := system.LoadConfig()
+	viperConf := viper.New()
+	viperConf.SetConfigName("config")       // name of config file (without extension)
+	viperConf.SetConfigType("toml")         // REQUIRED if the config file does not have the extension in the name
+	viperConf.AddConfigPath("/etc/fringe/") // path to look for the config file in
+	viperConf.AddConfigPath(".")            // optionally look for config in the working directory
+	config := system.LoadConfig(viperConf)
+
+	// Get the Secrets
 	secrets := system.LoadSecretsFromFile(config.Storage.SecretsFile)
 
+	// Get User Repository
 	db := openDB(config.Storage.UserDatabaseFile)
 	userRepo := openUserRepo(db)
 
