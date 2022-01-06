@@ -1,4 +1,4 @@
-name: CI
+name: "GoSec Scan"
 
 on:
   push:
