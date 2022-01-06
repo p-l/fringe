@@ -1,41 +1,47 @@
-[fringe]
+# [security]
 # Limit users accepted with email from this domain
 # allowed-domain = "yourdomain.com"
-
+#
 # Secret used to protect the JWT used after authentication.
 # secret = "<SOME RANDOME SECRET STRING>"
-
+#
 # Administration function are enabled for users with these emails
 # admin-emails = ["you@yourdomain.com"]
 
-[database]
-# Database location
-# database = /var/lib/fringe/fringe.db
-
-[radius]
-# Set a radius secret to be share between client and server should be a different secret from the fringe secret
-# secret = "<SOME RANDOM SECRET STRING>"
-
-[http]
-# Fringe must be behind an ngnix reverse proxy with TLS enabled (using https://letsencrypt.org is probably the easiest)
-# Set what root url should be used for HTTP redirect.
-# root-url = "https://fringe.yourdomain.com"
-
-[google-oauth]
-# You must create an OAuth application in the Google Developer Console
-# -> Instructions can be found here: https://support.google.com/cloud/answer/6158849?hl=en
-# The callback URL must be what you place in the http root-url config followed by /auth/google/callback/
+# [oauth.google]
+# Create the your oauth application from the API developer console
+# see: https://developers.google.com/identity/protocols/oauth2/web-server
 #
-# client-id = "GOOGLE_PROVIDED_CLIENT_ID.apps.googleusercontent.com"
-# client-secret = "GOOGLE_PROVIDED_CLIENT_SECRET"
+# When setting it up the callback URL will be:
+#    https://domain.from.config.below/auth/callback/google
+#
+# client-id = "LONG_RAND_STRING.apps.googleusercontent.com"
+# client-secret = "GOCSPX-LONG_RANDOM_STRING"
 
-[texts.password]
-# Fringe does not support multiple language just yet. Until then, you can alter and insert text using configuration
+# [web]
+# Set the publicly visible domain name for the web server
+# Defaults to IP from LAN
+# domain = "fringe.mydomain.com"
+#
+# Automatically get TLS server certification using https://letsencrypt.org
+# Defaults to yes if a domain (not an IP) is set.
+# lets-encrypt = true
 
-# Set a hint line under the password field (empty by default)
-# hint = "Save this password"
+# [storage]
+# Change the default locations for information storage.
+# Usually you should not need to change this
+#
+# User database file location
+# user-database = "/var/lib/fringe/fringe.db"
+#
+# Secrets key file location (where the Radius secret is located)
+# secrets-file = "/var/lib/fringe/secrets.json"
 
-# Add an info panel under password field to let users know where to use it. Title is the first line followed by
-# a list of items in an array (empty by default)
-# info-title = "Where to use"
-# info-items = ["Joining the enterprise wi-fi", "Connecting to the VPN"]
+# [services]
+# Set where fringe listen for each of its services.
+# You would only need to change this if it conflicts with other services
+# or if you wish to host it behind a reverse proxy
+#
+# http-bind-address = ":80"
+# https-bind-address = ":443"
+# radius-bind-address = ":1812"

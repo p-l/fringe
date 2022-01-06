@@ -1,7 +1,6 @@
 package mocks
 
 import (
-	"os"
 	"testing"
 
 	"github.com/jaswdr/faker"
@@ -10,16 +9,13 @@ import (
 	"modernc.org/ql"
 )
 
-// NewMockUserRepository returns an actual repos.UserRepository setup with fake data in a temporary directory.
+// NewMockUserRepository returns an actual repos.UserRepository system with fake data in a temporary directory.
 func NewMockUserRepository(t *testing.T) *repos.UserRepository {
 	t.Helper()
 
 	fake := faker.New()
 
-	tempDir, err := os.MkdirTemp("", "fringe_test_*")
-	if err != nil {
-		t.Fatalf("NewMockUserRepository: Could not create temp directory for ")
-	}
+	tempDir := t.TempDir()
 
 	// Initialize Database connexion
 	ql.RegisterDriver()
@@ -43,8 +39,7 @@ func NewMockUserRepository(t *testing.T) *repos.UserRepository {
 	}
 
 	t.Cleanup(func() {
-		connexion.Close()
-		err := os.RemoveAll(tempDir)
+		err := connexion.Close()
 		if err != nil {
 			t.Fatalf("NewMockUserRepository.Cleanup could clean up temp database (%s): %v", tempDir, err)
 		}

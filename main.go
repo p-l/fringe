@@ -2,12 +2,12 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"io/fs"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
@@ -16,109 +16,125 @@ import (
 	"github.com/p-l/fringe/internal/httpd"
 	"github.com/p-l/fringe/internal/radiusd"
 	"github.com/p-l/fringe/internal/repos"
+	"github.com/p-l/fringe/internal/system"
 	"github.com/p-l/fringe/templates"
 	"github.com/spf13/viper"
+	"golang.org/x/crypto/acme/autocert"
 	"layeh.com/radius"
 	"modernc.org/ql"
 )
 
-func loadConfigFile() {
-	viper.SetConfigName("config")       // name of config file (without extension)
-	viper.SetConfigType("toml")         // REQUIRED if the config file does not have the extension in the name
-	viper.AddConfigPath("/etc/fringe/") // path to look for the config file in
-	viper.AddConfigPath(".")            // optionally look for config in the working directory
-
-	// Default values
-	viper.SetDefault("http.root", "http://127.0.0.1:9990/")
-	viper.SetDefault("database.location", "/var/lib/fringe/users.repos")
-
-	// Read the configuration
-	if err := viper.ReadInConfig(); err != nil {
-		log.Panicf("Fatal error config file: %v", err)
-	}
-}
-
-func fatalOnInvalidConfig() {
-	criticalKeys := []string{
-		"fringe.allowed-domain",
-		"fringe.secret",
-		"radius.secret",
-		"google-oauth.client-id",
-		"google-oauth.client-secret",
-	}
-
-	for _, key := range criticalKeys {
-		if len(viper.GetString(key)) == 0 {
-			entries := strings.Split(key, ".")
-			log.Panicf("FATAL: missing configuration key %s under section %s in configuration file", entries[1], entries[0])
-		}
-	}
-}
-
-func httpSrvTextsFromConfig() httpd.Texts {
-	return httpd.Texts{
-		PasswordHint:          viper.GetString("texts.password.hint"),
-		PasswordInfoCardTitle: viper.GetString("texts.password.info-title"),
-		PasswordInfoCardItems: viper.GetStringSlice("texts.password.info-items"),
-	}
-}
-
 const terminationWait = time.Second * 5
 
-func main() {
-	// Load and validate configuration
-	loadConfigFile()
-	fatalOnInvalidConfig()
-
+func openDB(databaseFile string) *sqlx.DB {
 	// Initialize Database connexion
 	ql.RegisterDriver()
 
-	connexion, err := sqlx.Open("ql", viper.GetString("database.location"))
+	db, err := sqlx.Open("ql", databaseFile)
 	if err != nil {
-		log.Panicf("FATAL: Could not connect to database: %v", err)
+		log.Panicf("could not connect to database: %v", err)
 	}
 
+	return db
+}
+
+func openUserRepo(connexion *sqlx.DB) *repos.UserRepository {
 	userRepo, err := repos.NewUserRepository(connexion)
 	if err != nil {
-		log.Panicf("FATAL: Could not initate user reposityr: %v", err)
+		log.Panicf("could not initate user repository: %v", err)
 	}
 
-	// Get Radius Started
-	radiusSrv := radiusd.NewRadiusServer(userRepo, viper.GetString("radius.secret"))
+	return userRepo
+}
 
-	go func() {
-		if err := radiusSrv.ListenAndServe(); err != nil {
-			log.Println(err)
-		}
-	}()
-
+func newWebServers(config system.Config, userRepo *repos.UserRepository, jwtSecret string) (*http.Server, *http.Server) {
 	staticTemplates := fs.FS(templates.Files())
 	staticAssets := fs.FS(assets.Files())
-	httpSrvTexts := httpSrvTextsFromConfig()
 
-	// HTTP
-	httpSrv := httpd.NewHTTPServer(
+	// HTTPS
+	httpsSrv := httpd.NewHTTPServer(
+		config,
 		userRepo,
 		staticTemplates,
 		staticAssets,
-		viper.GetString("http.root-url"),
-		viper.GetStringSlice("fringe.admin-emails"),
-		viper.GetString("google-oauth.client-id"),
-		viper.GetString("google-oauth.client-secret"),
-		viper.GetString("fringe.allowed-domain"),
-		viper.GetString("fringe.secret"),
-		httpSrvTexts)
+		jwtSecret)
 
+	// TLS Cert Manager
+	var certManager *autocert.Manager
+
+	var tlsConfig *tls.Config
+
+	if config.Web.UseLetsEncrypt {
+		certManager = &autocert.Manager{
+			Prompt:     autocert.AcceptTOS,
+			HostPolicy: autocert.HostWhitelist(config.Web.Domain),
+			Cache:      autocert.DirCache("certs"),
+		}
+		tlsConfig = &tls.Config{
+			GetCertificate: certManager.GetCertificate,
+			MinVersion:     tls.VersionTLS12,
+		}
+	} else {
+		tlsConfig = system.TLSConfigWithSelfSignedCert(system.AllLocalIPAddresses())
+	}
+
+	// Add the TLS configuration to the https server
+	httpsSrv.TLSConfig = tlsConfig
+
+	// HTTP to HTTPS Redirection and autocert server
+	redirectSrv := httpd.NewRedirectServer(
+		config.Services.HTTPBindAddress,
+		config.Web.Domain,
+		certManager)
+
+	return httpsSrv, redirectSrv
+}
+
+func main() {
+	// Load and validate configuration
+	viperConf := viper.New()
+	viperConf.SetConfigName("config")       // name of config file (without extension)
+	viperConf.SetConfigType("toml")         // REQUIRED if the config file does not have the extension in the name
+	viperConf.AddConfigPath("/etc/fringe/") // path to look for the config file in
+	viperConf.AddConfigPath(".")            // optionally look for config in the working directory
+	config := system.LoadConfig(viperConf)
+
+	// Get the Secrets
+	secrets := system.LoadSecretsFromFile(config.Storage.SecretsFile)
+
+	// Get User Repository
+	db := openDB(config.Storage.UserDatabaseFile)
+	userRepo := openUserRepo(db)
+
+	// Servers
+	radiusSrv := radiusd.NewRadiusServer(userRepo, secrets.Radius)
+	httpsSrv, redirectSrv := newWebServers(config, userRepo, secrets.JWT)
+
+	// Start Radius
 	go func() {
-		if err := httpSrv.ListenAndServe(); err != nil {
-			log.Println(err)
+		if err := radiusSrv.ListenAndServe(); err != nil {
+			log.Panicf("radius server died with error: %v", err)
 		}
 	}()
 
-	waitOn(httpSrv, radiusSrv, connexion)
+	// Start HTTPS
+	go func() {
+		if err := httpsSrv.ListenAndServeTLS("", ""); err != nil {
+			log.Panicf("web server (https) died with error: %v", err)
+		}
+	}()
+
+	// Start HTTP
+	go func() {
+		if err := redirectSrv.ListenAndServe(); err != nil {
+			log.Panicf("web redirect server (http) died with error: %v", err)
+		}
+	}()
+
+	waitOn(httpsSrv, redirectSrv, radiusSrv, db)
 }
 
-func waitOn(httpSrv *http.Server, radiusSrv *radius.PacketServer, connexion *sqlx.DB) {
+func waitOn(httpSrv *http.Server, redirectSrv *http.Server, radiusSrv *radius.PacketServer, connexion *sqlx.DB) {
 	c := make(chan os.Signal, 1)
 	// We'll accept graceful shutdowns when quit via SIGINT or SIGTERM
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
@@ -134,6 +150,7 @@ func waitOn(httpSrv *http.Server, radiusSrv *radius.PacketServer, connexion *sql
 	// until the timeout deadline.
 	_ = httpSrv.Shutdown(ctx)
 	_ = radiusSrv.Shutdown(ctx)
+	_ = redirectSrv.Shutdown(ctx)
 	_ = connexion.Close()
 
 	// Optionally, you could run srv.Shutdown in a goroutine and block on

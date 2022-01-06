@@ -2,6 +2,7 @@ BIN_DIR := "bin"
 BIN_FILE := fringe-server
 BUILD_ARTIFACTS_DIR := "artifacts"
 DB_DIR := "db"
+CERT_DIR := "certs"
 VERSION := $(shell cat VERSION)-$(shell git rev-parse --short HEAD)
 GOOS := $(shell go env GOOS)
 GOARCH := $(shell go env GOARCH)

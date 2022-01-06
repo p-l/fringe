@@ -39,7 +39,7 @@ if [ ! -x $DAEMON ]; then
 fi
 
 # PID file for the daemon
-PIDFILE=/var/run/fringe/fringe.pid
+PIDFILE=/var/lib/fringe/fringe.pid
 PIDDIR=$(dirname $PIDFILE)
 if [ ! -d "$PIDDIR" ]; then
     mkdir -p $PIDDIR

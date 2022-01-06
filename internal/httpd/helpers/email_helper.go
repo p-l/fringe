@@ -2,14 +2,14 @@ package helpers
 
 import (
 	"fmt"
-	"net/mail"
+	"regexp"
 	"strings"
 )
 
 func IsEmailValid(email string) bool {
-	_, err := mail.ParseAddress(email)
+	emailRegex := regexp.MustCompile(`^[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,4}$`)
 
-	return err == nil
+	return emailRegex.MatchString(email)
 }
 
 func IsEmailInDomain(email string, domain string) bool {
