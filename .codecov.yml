@@ -1,8 +1,2 @@
 ignore:
   - "internal/mocks"
-  - "*_test.go"
-  - "assets"
-  - "config"
-  - "scripts"
-  - "system"
-  - "templates"
