@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
 
 	"github.com/sethvargo/go-password/password"
 )
@@ -46,7 +47,7 @@ func LoadSecretsFromFile(file string) Secrets {
 		return secrets
 	}
 
-	bytes, err := ioutil.ReadFile(file)
+	bytes, err := ioutil.ReadFile(filepath.Clean(file))
 	if err != nil {
 		log.Panicf("could not read secrets repository file %s: %v", file, err)
 	}
@@ -72,5 +73,5 @@ func LoadSecretsFromFile(file string) Secrets {
 
 func SaveSecretsToFile(secrets Secrets, file string) {
 	jsonData, _ := json.MarshalIndent(secrets, "", " ")
-	_ = ioutil.WriteFile(file, jsonData, secretsFilePermission)
+	_ = ioutil.WriteFile(filepath.Clean(file), jsonData, secretsFilePermission)
 }

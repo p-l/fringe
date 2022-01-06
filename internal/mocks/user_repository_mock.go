@@ -1,7 +1,6 @@
 package mocks
 
 import (
-	"os"
 	"testing"
 
 	"github.com/jaswdr/faker"
@@ -16,10 +15,7 @@ func NewMockUserRepository(t *testing.T) *repos.UserRepository {
 
 	fake := faker.New()
 
-	tempDir, err := os.MkdirTemp("", "fringe_test_*")
-	if err != nil {
-		t.Fatalf("NewMockUserRepository: Could not create temp directory for ")
-	}
+	tempDir := t.TempDir()
 
 	// Initialize Database connexion
 	ql.RegisterDriver()
@@ -43,8 +39,7 @@ func NewMockUserRepository(t *testing.T) *repos.UserRepository {
 	}
 
 	t.Cleanup(func() {
-		connexion.Close()
-		err := os.RemoveAll(tempDir)
+		err := connexion.Close()
 		if err != nil {
 			t.Fatalf("NewMockUserRepository.Cleanup could clean up temp database (%s): %v", tempDir, err)
 		}
