@@ -112,6 +112,10 @@ func createServerCertificate(caCert *x509.Certificate, caPrivateKey *rsa.Private
 }
 
 func TLSConfigWithSelfSignedCert(ips []net.IP) (serverTLSConf *tls.Config) {
+	if len(ips) == 0 {
+		return nil
+	}
+
 	caPrivateKey := createPrivateKey()
 	certPrivateKey := createPrivateKey()
 	caCert := createCertificateAuthorityCert(caPrivateKey)
