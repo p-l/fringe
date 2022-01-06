@@ -1,4 +1,4 @@
-[fringe]
+# [security]
 # Limit users accepted with email from this domain
 # allowed-domain = "yourdomain.com"
 #
@@ -8,45 +8,40 @@
 # Administration function are enabled for users with these emails
 # admin-emails = ["you@yourdomain.com"]
 
-[database]
-# Database location
-# database = /var/lib/fringe/fringe.db
+# [oauth.google]
+# Create the your oauth application from the API developer console
+# see: https://developers.google.com/identity/protocols/oauth2/web-server
+#
+# When setting it up the callback URL will be:
+#    https://domain.from.config.below/auth/callback/google
+#
+# client-id = "LONG_RAND_STRING.apps.googleusercontent.com"
+# client-secret = "GOCSPX-LONG_RANDOM_STRING"
 
-[radius]
-# Set a radius secret to be share between client and server should be a different secret from the fringe secret
-# secret = "<SOME RANDOM SECRET STRING>"
-
-[web]
+# [web]
 # Set the publicly visible domain name for the web server
+# Defaults to IP from LAN
 # domain = "fringe.mydomain.com"
 #
 # Automatically get TLS server certification using https://letsencrypt.org
+# Defaults to yes if a domain (not an IP) is set.
 # lets-encrypt = true
+
+# [storage]
+# Change the default locations for information storage.
+# Usually you should not need to change this
 #
-# Specify the location of the certificate (when lets-encrypt = false)
-# tls-cert-file = "certs/server.crt"
-# tls-key-file = "certs/server.key"
+# User database file location
+# user-database = "/var/lib/fringe/fringe.db"
 #
-# Specify where the HTTP and HTTPS server listen for incoming connection. You can restrict to a specific adaptor
-# by specifying its IP address at the begining (ex: "127.0.0.1:80" or "10.0.0.1:443")
+# Secrets key file location (where the Radius secret is located)
+# secrets-file = "/var/lib/fringe/secrets.json"
+
+# [services]
+# Set where fringe listen for each of its services.
+# You would only need to change this if it conflicts with other services
+# or if you wish to host it behind a reverse proxy
+#
 # http-bind-address = ":80"
 # https-bind-address = ":443"
-
-[google-oauth]
-# You must create an OAuth application in the Google Developer Console
-# -> Instructions can be found here: https://support.google.com/cloud/answer/6158849?hl=en
-# The callback URL must be what you place in the http root-url config followed by /auth/google/callback/
-#
-# client-id = "GOOGLE_PROVIDED_CLIENT_ID.apps.googleusercontent.com"
-# client-secret = "GOOGLE_PROVIDED_CLIENT_SECRET"
-
-[texts.password]
-# Fringe does not support multiple language just yet. Until then, you can alter and insert text using configuration
-#
-# Set a hint line under the password field (empty by default)
-# hint = "Save this password"
-#
-# Add an info panel under password field to let users know where to use it. Title is the first line followed by
-# a list of items in an array (empty by default)
-# info-title = "Where to use"
-# info-items = ["Joining the enterprise wi-fi", "Connecting to the VPN"]
+# radius-bind-address = ":1812"
