@@ -49,7 +49,7 @@ func openUserRepo(connexion *sqlx.DB) *repos.UserRepository {
 
 func newWebServers(config system.Config, userRepo *repos.UserRepository, jwtSecret string) (*http.Server, *http.Server) {
 	staticTemplates := fs.FS(templates.Files())
-	clientAssets := fs.FS(client.Files())
+	clientAssets := client.Files()
 
 	// HTTPS
 	httpsSrv := httpd.NewHTTPServer(
