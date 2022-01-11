@@ -30,17 +30,10 @@ func (a *AuthMiddleware) IsProtected(path string) bool {
 	log.Printf("DEBUG: path=%s", path)
 
 	for _, protected := range a.ProtectedPaths {
-		log.Printf("DEBUG: path=%s protected=%s", path, protected)
-
 		if strings.HasPrefix(path, protected) {
-			log.Printf("DEBUG: path=%s protected=%s MATCH!", path, protected)
-
 			// Is it an exception?
 			for _, excluded := range a.ExcludedPaths {
-				log.Printf("DEBUG: path=%s protected=%s excluded=%s", path, protected, excluded)
-
 				if strings.HasPrefix(path, excluded) {
-					log.Printf("DEBUG: path=%s protected=%s excluded=%s MATCH!", path, protected, excluded)
 					return false
 				}
 			}
