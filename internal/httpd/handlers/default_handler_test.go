@@ -42,7 +42,7 @@ func TestDefaultHandler_Root(t *testing.T) {
 		userRepo := mocks.NewMockUserRepository(t)
 
 		authHelper := helpers.NewAuthHelper("test.com", "secret", []string{})
-		authMiddleware := middlewares.NewAuthMiddleware("/auth", []string{}, authHelper)
+		authMiddleware := middlewares.NewAuthMiddleware("/auth", []string{"/"}, []string{}, authHelper)
 
 		defaultHandler := handlers.NewDefaultHandler(userRepo, pageHelper)
 
@@ -79,7 +79,7 @@ func TestDefaultHandler_Root(t *testing.T) {
 		userRepo := mocks.NewMockUserRepository(t)
 
 		authHelper := helpers.NewAuthHelper("test.com", "secret", []string{})
-		authMiddleware := middlewares.NewAuthMiddleware("/auth", []string{}, authHelper)
+		authMiddleware := middlewares.NewAuthMiddleware("/auth", []string{"/"}, []string{}, authHelper)
 		defaultHandler := handlers.NewDefaultHandler(userRepo, pageHelper)
 		claims := helpers.NewAuthClaims("user_does_not_exist@not_a_user.com", "")
 		tokenCookie := authHelper.NewJWTCookieFromClaims(claims)

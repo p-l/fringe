@@ -51,7 +51,7 @@ func makeRequestToHandlerWithClaims(claims *helpers.AuthClaims, path string, han
 		req.AddCookie(tokenCookie)
 	}
 
-	authMiddleware := middlewares.NewAuthMiddleware("/auth", []string{}, authHelper)
+	authMiddleware := middlewares.NewAuthMiddleware("/auth", []string{"/"}, []string{}, authHelper)
 	router.Use(authMiddleware.EnsureAuth)
 	router.HandleFunc(path, handler)
 	router.ServeHTTP(res, req)

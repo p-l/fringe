@@ -4,9 +4,9 @@
 # https://github.com/influxdata/fringe/blob/c80c3636dd7bba6c3d0f3d6a1c321862da8f201a/releng/packages/fs/usr/local/bin/fringe_packages.bash
 set -e
 
-ARTIFACTS_DIR="artifacts"
-OUT_DIR="$ARTIFACTS_DIR"/out
-PKG_DIR="$ARTIFACTS_DIR"/pkg
+PACKAGES_DIR="artifacts"
+OUT_DIR="$PACKAGES_DIR"/out
+PKG_DIR="$PACKAGES_DIR"/pkg
 BIN_DIR="bin"
 BIN_FILE="fringe-server"
 version=$(git rev-parse --short HEAD)
@@ -24,7 +24,7 @@ DEB_PACKAGE_URL="https://github.com/p-l/fringe"
 make GOOS="$GOOS" GOARCH="$GOARCH" build
 
 # Create package directory
-mkdir -p $ARTIFACTS_DIR \
+mkdir -p $PACKAGES_DIR \
          "$OUT_DIR" \
          "$PKG_DIR" \
          "$PKG_DIR"/usr/bin \
@@ -74,9 +74,9 @@ bundle exec fpm --verbose \
   --chdir "$PKG_DIR" \
   -p "$OUT_DIR"/"$PACKAGE_FILENAME"
 
-mv "$OUT_DIR"/"$PACKAGE_FILENAME" "$ARTIFACTS_DIR/"
+mv "$OUT_DIR"/"$PACKAGE_FILENAME" "$PACKAGES_DIR/"
 rm -rf "$OUT_DIR"
 rm -rf "$PKG_DIR"
 
-md5sum "$ARTIFACTS_DIR"/"$PACKAGE_FILENAME" > "$ARTIFACTS_DIR"/"$PACKAGE_FILENAME".md5
-sha256sum "$ARTIFACTS_DIR"/"$PACKAGE_FILENAME" > "$ARTIFACTS_DIR"/"$PACKAGE_FILENAME".sha256
+md5sum "$PACKAGES_DIR"/"$PACKAGE_FILENAME" > "$PACKAGES_DIR"/"$PACKAGE_FILENAME".md5
+sha256sum "$PACKAGES_DIR"/"$PACKAGE_FILENAME" > "$PACKAGES_DIR"/"$PACKAGE_FILENAME".sha256

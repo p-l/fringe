@@ -21,7 +21,7 @@ func TestEnsureAuth(t *testing.T) {
 
 		authPath := "/test/auth"
 		authHelper := helpers.NewAuthHelper("@test.com", "secret", []string{})
-		authMiddleware := middlewares.NewAuthMiddleware(authPath, []string{}, authHelper)
+		authMiddleware := middlewares.NewAuthMiddleware(authPath, []string{"/"}, []string{}, authHelper)
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		res := httptest.NewRecorder()
@@ -46,9 +46,10 @@ func TestEnsureAuth(t *testing.T) {
 
 		testSkipAuthRootPath := "/skip-auth"
 		testSkipAuthSubPath := testSkipAuthRootPath + "/test"
+		protectedPaths := []string{"/"}
 		skipPaths := []string{testSkipAuthRootPath}
 		authHelper := helpers.NewAuthHelper("@test.com", "secret", []string{})
-		authMiddleware := middlewares.NewAuthMiddleware(testSkipAuthRootPath, skipPaths, authHelper)
+		authMiddleware := middlewares.NewAuthMiddleware(testSkipAuthRootPath, protectedPaths, skipPaths, authHelper)
 
 		req := httptest.NewRequest(http.MethodGet, testSkipAuthSubPath, nil)
 		res := httptest.NewRecorder()
@@ -73,7 +74,7 @@ func TestEnsureAuth(t *testing.T) {
 		fake := faker.New()
 
 		authHelper := helpers.NewAuthHelper("@test.com", "secret", []string{})
-		authMiddleware := middlewares.NewAuthMiddleware("/auth/", []string{"/no-auth"}, authHelper)
+		authMiddleware := middlewares.NewAuthMiddleware("/auth/", []string{"/"}, []string{"/no-auth"}, authHelper)
 
 		validClaims := helpers.NewAuthClaims(fake.Internet().Email(), "")
 		// Force expiry to be 1 minute in the future
@@ -114,7 +115,7 @@ func TestEnsureAuth(t *testing.T) {
 
 		authPath := "/auth/"
 		authHelper := helpers.NewAuthHelper("@test.com", "secret", []string{})
-		authMiddleware := middlewares.NewAuthMiddleware(authPath, []string{"/no-auth"}, authHelper)
+		authMiddleware := middlewares.NewAuthMiddleware(authPath, []string{"/"}, []string{"/no-auth"}, authHelper)
 
 		validClaims := helpers.NewAuthClaims(fake.Internet().Email(), "")
 		// Force expiry to be 1 minute ago

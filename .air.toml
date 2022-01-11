@@ -15,9 +15,9 @@ full_bin = "APP_ENV=dev bin/fringe-air"
 # Watch these filename extensions.
 include_ext = ["go", "gohtml", "css", "toml"]
 # Ignore these filename extensions or directories.
-exclude_dir = ["tmp", "db", "vendor", "scripts", "system"]
+exclude_dir = ["tmp", "db", "vendor", "scripts", "system", "client", "node_modules"]
 # Watch these directories if you specified.
-include_dir = []
+include_dir = ["client/build"]
 # Exclude files.
 exclude_file = []
 # Exclude specific regular expressions.

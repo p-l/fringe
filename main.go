@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/p-l/fringe/assets"
+	"github.com/p-l/fringe/client"
 	"github.com/p-l/fringe/internal/httpd"
 	"github.com/p-l/fringe/internal/radiusd"
 	"github.com/p-l/fringe/internal/repos"
@@ -49,14 +49,14 @@ func openUserRepo(connexion *sqlx.DB) *repos.UserRepository {
 
 func newWebServers(config system.Config, userRepo *repos.UserRepository, jwtSecret string) (*http.Server, *http.Server) {
 	staticTemplates := fs.FS(templates.Files())
-	staticAssets := fs.FS(assets.Files())
+	clientAssets := fs.FS(client.Files())
 
 	// HTTPS
 	httpsSrv := httpd.NewHTTPServer(
 		config,
 		userRepo,
 		staticTemplates,
-		staticAssets,
+		clientAssets,
 		jwtSecret)
 
 	// TLS Cert Manager

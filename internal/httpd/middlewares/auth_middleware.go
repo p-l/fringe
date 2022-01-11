@@ -11,35 +11,64 @@ import (
 )
 
 type AuthMiddleware struct {
-	authHelper    *helpers.AuthHelper
-	ExcludedPaths []string
-	AuthPath      string
+	authHelper     *helpers.AuthHelper
+	AuthPath       string
+	ExcludedPaths  []string
+	ProtectedPaths []string
 }
 
-func NewAuthMiddleware(redirectToAuthPath string, excludedPaths []string, authHelper *helpers.AuthHelper) *AuthMiddleware {
+func NewAuthMiddleware(redirectToAuthPath string, protectedPaths []string, excludedPaths []string, authHelper *helpers.AuthHelper) *AuthMiddleware {
 	return &AuthMiddleware{
-		authHelper:    authHelper,
-		ExcludedPaths: append(excludedPaths, redirectToAuthPath),
-		AuthPath:      redirectToAuthPath,
+		authHelper:     authHelper,
+		AuthPath:       redirectToAuthPath,
+		ExcludedPaths:  excludedPaths,
+		ProtectedPaths: protectedPaths,
 	}
+}
+
+func (a *AuthMiddleware) IsProtected(path string) bool {
+	log.Printf("DEBUG: path=%s", path)
+
+	for _, protected := range a.ProtectedPaths {
+		log.Printf("DEBUG: path=%s protected=%s", path, protected)
+
+		if strings.HasPrefix(path, protected) {
+			log.Printf("DEBUG: path=%s protected=%s MATCH!", path, protected)
+
+			// Is it an exception?
+			for _, excluded := range a.ExcludedPaths {
+				log.Printf("DEBUG: path=%s protected=%s excluded=%s", path, protected, excluded)
+
+				if strings.HasPrefix(path, excluded) {
+					log.Printf("DEBUG: path=%s protected=%s excluded=%s MATCH!", path, protected, excluded)
+					return false
+				}
+			}
+
+			// Not an exception
+			return true
+		}
+	}
+
+	// Is not under the protected list
+	return false
 }
 
 func (a *AuthMiddleware) EnsureAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(httpResponse http.ResponseWriter, httpRequest *http.Request) {
 		uri, _ := url.Parse(httpRequest.RequestURI)
 
-		// Skip auth validation for excluded path
-		for _, path := range a.ExcludedPaths {
-			if strings.HasPrefix(uri.Path, path) {
-				log.Printf("Auth [src:%v] %s matches excluded path %s, skipping auth", httpRequest.RemoteAddr, sanitize.URL(uri.Path), sanitize.URL(path))
-				next.ServeHTTP(httpResponse, httpRequest)
+		protected := a.IsProtected(uri.Path)
+		if !protected {
+			log.Printf("Auth [src:%v] %s is not protected, skipping auth", httpRequest.RemoteAddr, sanitize.URL(uri.Path))
+			next.ServeHTTP(httpResponse, httpRequest)
 
-				return
-			}
+			return
 		}
 
 		tokenCookie, err := httpRequest.Cookie("token")
 		if err != nil {
+			log.Printf("Auth [src:%v] %s requested without token, redirecting to %s", httpRequest.RemoteAddr, sanitize.URL(uri.Path), a.AuthPath)
 			http.Redirect(httpResponse, httpRequest, a.AuthPath, http.StatusFound)
 
 			return

@@ -13,8 +13,9 @@ type SecurityConfig struct {
 }
 
 type WebConfig struct {
-	Domain         string `mapstructure:"domain"`
-	UseLetsEncrypt bool   `mapstructure:"lets-encrypt"` //nolint:tagliatelle
+	Domain         string   `mapstructure:"domain"`
+	UseLetsEncrypt bool     `mapstructure:"lets-encrypt"` //nolint:tagliatelle
+	AllowOrigins   []string `mapstructure:"allow-origins"`
 }
 
 type StorageConfig struct {
