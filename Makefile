@@ -41,8 +41,6 @@ lint-fix: ## 📜 Lint & format, will try to fix errors and modify code
 dep: ## 📥 Download and install dependencies
 	mkdir -p $(BUILD_BIN_DIR)
 	mkdir -p $(BUILD_CLIENT_DIST_DIR)
-	go get -t -v ./...
-	go mod tidy
 	go mod download
 	cd $(CLIENT_DIR); npm install --silent
 
@@ -72,11 +70,15 @@ test: ## 🎯 Unit test for server and client
 .PHONY: clean
 clean: ## 🧹 Clean up project
 	go clean
+	rm -f coverage.txt
 	rm -rf $(BUILD_BIN_DIR)
 	rm -rf $(BUILD_PACKAGES_DIR)
 	rm -rf $(RUN_DB_DIR)
 	rm -rf $(RUN_CERTS_DIR)
 	rm -rf $(CLIENT_DIR)/node_modules
+	rm -rf $(CLIENT_DIR)/coverage
+	rm -rf $(BUILD_CLIENT_DIST_DIR)
+
 
 
 
