@@ -1,6 +1,7 @@
 package handlers_test
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -53,12 +54,12 @@ func TestDefaultHandler_Root(t *testing.T) {
 
 		user := users[0]
 		claims := helpers.NewAuthClaims(user.Email, "")
-		tokenCookie := authHelper.NewJWTCookieFromClaims(claims)
+		token := authHelper.NewJWTSignedString(claims)
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		res := httptest.NewRecorder()
 
-		req.AddCookie(tokenCookie)
+		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
 
 		router := mux.NewRouter()
 		router.Use(authMiddleware.EnsureAuth)
@@ -82,12 +83,12 @@ func TestDefaultHandler_Root(t *testing.T) {
 		authMiddleware := middlewares.NewAuthMiddleware("/auth", []string{"/"}, []string{}, authHelper)
 		defaultHandler := handlers.NewDefaultHandler(userRepo, pageHelper)
 		claims := helpers.NewAuthClaims("user_does_not_exist@not_a_user.com", "")
-		tokenCookie := authHelper.NewJWTCookieFromClaims(claims)
+		token := authHelper.NewJWTSignedString(claims)
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		res := httptest.NewRecorder()
 
-		req.AddCookie(tokenCookie)
+		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
 
 		router := mux.NewRouter()
 		router.Use(authMiddleware.EnsureAuth)

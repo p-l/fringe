@@ -1,6 +1,7 @@
 package system
 
 import (
+	"fmt"
 	"log"
 	"net"
 
@@ -16,6 +17,7 @@ type WebConfig struct {
 	Domain         string   `mapstructure:"domain"`
 	UseLetsEncrypt bool     `mapstructure:"lets-encrypt"` //nolint:tagliatelle
 	AllowOrigins   []string `mapstructure:"allow-origins"`
+	ReverseProxy   string   `mapstructure:"reverse-proxy"`
 }
 
 type StorageConfig struct {
@@ -65,10 +67,15 @@ func LoadConfig(viperConf *viper.Viper) Config {
 
 	// Disable lets-encrypt if domain is an IP
 	domain := viperConf.GetString("web.domain")
-
 	if addr := net.ParseIP(domain); addr != nil {
 		viperConf.Set("web.lets-encrypt", false)
 	}
+
+	// force local domain in allowedOrigin
+	allowedOrigin := viperConf.GetStringSlice("web.allow-origins")
+	allowedOrigin = append(allowedOrigin, fmt.Sprintf("https://%s", domain))
+	allowedOrigin = append(allowedOrigin, fmt.Sprintf("http://%s", domain))
+	viperConf.Set("web.allow-origins", allowedOrigin)
 
 	var config Config
 	if err := viperConf.Unmarshal(&config); err != nil {

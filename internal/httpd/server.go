@@ -5,6 +5,8 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -49,8 +51,7 @@ func NewHTTPServer(config system.Config, repo *repos.UserRepository, templates f
 
 	// Hook the handlers
 	router.HandleFunc("/api/", homeHandler.Root).Methods(http.MethodGet)
-	router.HandleFunc("/api/auth/", authHandler.RootHandler).Methods(http.MethodGet)
-	router.HandleFunc("/api/auth/google/callback", authHandler.GoogleCallbackHandler).Methods(http.MethodGet)
+	router.HandleFunc("/api/auth/", authHandler.Login).Methods(http.MethodPost)
 	router.HandleFunc("/api/config/", configHandler.Root).Methods(http.MethodGet)
 	router.HandleFunc("/api/user/", userHandler.List).Methods("GET")
 	router.HandleFunc("/api/user/{email}/", userHandler.View).Methods(http.MethodGet, http.MethodDelete)
@@ -58,20 +59,24 @@ func NewHTTPServer(config system.Config, repo *repos.UserRepository, templates f
 	router.HandleFunc("/api/user/{email}/password", userHandler.Renew).Methods(http.MethodGet)
 	router.HandleFunc("/api/user/{email}/delete", userHandler.Delete).Methods(http.MethodGet)
 
-	// Serve the static web client
-	router.PathPrefix("/").Handler(http.StripPrefix("/", http.FileServer(http.FS(clientAssets))))
+	// Serve the web client
+	if len(config.Web.ReverseProxy) == 0 {
+		// Built-in client
+		router.PathPrefix("/").Handler(http.StripPrefix("/", http.FileServer(http.FS(clientAssets))))
+		router.NotFoundHandler = http.HandlerFunc(homeHandler.NotFound)
+	} else {
+		log.Printf("Using reverse proxy from %s instead of serving files", config.Web.ReverseProxy)
+		proxyURL, err := url.Parse(config.Web.ReverseProxy)
+		if err != nil {
+			log.Panicf("invalid reverse proxy url: %v", err)
+		}
 
-	router.NotFoundHandler = http.HandlerFunc(homeHandler.NotFound)
+		reverseProxy := httputil.NewSingleHostReverseProxy(proxyURL)
+		router.Handle("/", reverseProxy)
+		router.NotFoundHandler = reverseProxy
+	}
 
-	corsHandler := cors.New(cors.Options{
-		AllowCredentials: false,
-		AllowedOrigins:   config.Web.AllowOrigins,
-		AllowedMethods:   []string{http.MethodGet},
-		MaxAge:           int(preFlightCacheMaxAge.Seconds()),
-		Debug:            true,
-	})
-
-	httpdHandler := corsHandler.Handler(router)
+	httpdHandler := addCORS(config.Web.AllowOrigins, router)
 
 	log.Printf("Created httpd server on %s", config.Services.HTTPSBindAddress)
 	httpd := http.Server{
@@ -83,4 +88,21 @@ func NewHTTPServer(config system.Config, repo *repos.UserRepository, templates f
 	}
 
 	return &httpd
+}
+
+func addCORS(allowedOrigins []string, router *mux.Router) http.Handler {
+	for _, origin := range allowedOrigins {
+		log.Printf("HTTPD Allowed Origin: %s", origin)
+	}
+
+	corsHandler := cors.New(cors.Options{
+		AllowCredentials: false,
+		AllowedOrigins:   allowedOrigins,
+		AllowedMethods:   []string{http.MethodGet, http.MethodPost, http.MethodOptions},
+		AllowedHeaders:   []string{"accept", "authorization", "content-type"},
+		MaxAge:           int(preFlightCacheMaxAge.Seconds()),
+		Debug:            true,
+	})
+
+	return corsHandler.Handler(router)
 }
