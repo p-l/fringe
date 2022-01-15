@@ -1,6 +1,7 @@
 package middlewares_test
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -69,7 +70,7 @@ func TestEnsureAuth(t *testing.T) {
 		assert.Equal(t, http.StatusTeapot, res.Result().StatusCode)
 	})
 
-	t.Run("let valid and refreshed tokens through", func(t *testing.T) {
+	t.Run("let valid tokens through", func(t *testing.T) {
 		t.Parallel()
 		fake := faker.New()
 
@@ -79,10 +80,10 @@ func TestEnsureAuth(t *testing.T) {
 		validClaims := helpers.NewAuthClaims(fake.Internet().Email(), "")
 		// Force expiry to be 1 minute in the future
 		validClaims.StandardClaims.ExpiresAt = time.Now().Add(1 * time.Minute).Unix()
-		validTokenCookie := authHelper.NewJWTCookieFromClaims(validClaims)
+		validToken := authHelper.NewJWTSignedString(validClaims)
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
-		req.AddCookie(validTokenCookie)
+		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", validToken))
 		res := httptest.NewRecorder()
 
 		router := mux.NewRouter()
@@ -94,19 +95,6 @@ func TestEnsureAuth(t *testing.T) {
 
 		// Make sure the handler ran by testing for a specific result code.
 		assert.Equal(t, http.StatusTeapot, res.Result().StatusCode)
-
-		// Ensure the token refreshed
-		cookies := res.Result().Cookies()
-		assert.NotNil(t, cookies)
-		assert.Equal(t, 1, len(cookies))
-
-		authCookie := cookies[0]
-		assert.Equal(t, "token", authCookie.Name)
-		assert.Greater(t, authCookie.Expires.Unix(), validClaims.StandardClaims.ExpiresAt)
-
-		cookieClaims, err := authHelper.AuthClaimsFromSignedToken(authCookie.Value)
-		assert.Nil(t, err)
-		assert.Greater(t, cookieClaims.StandardClaims.ExpiresAt, validClaims.StandardClaims.ExpiresAt)
 	})
 
 	t.Run("rejects expired tokens", func(t *testing.T) {
@@ -120,10 +108,10 @@ func TestEnsureAuth(t *testing.T) {
 		validClaims := helpers.NewAuthClaims(fake.Internet().Email(), "")
 		// Force expiry to be 1 minute ago
 		validClaims.StandardClaims.ExpiresAt = time.Now().Add(-1 * time.Minute).Unix()
-		validTokenCookie := authHelper.NewJWTCookieFromClaims(validClaims)
+		validToken := authHelper.NewJWTSignedString(validClaims)
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
-		req.AddCookie(validTokenCookie)
+		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", validToken))
 		res := httptest.NewRecorder()
 
 		router := mux.NewRouter()
@@ -139,15 +127,5 @@ func TestEnsureAuth(t *testing.T) {
 		target, err := res.Result().Location()
 		assert.Nil(t, err)
 		assert.Equal(t, authPath, target.Path)
-
-		// Ensure the token is removed
-		cookies := res.Result().Cookies()
-		assert.NotNil(t, cookies)
-		assert.Equal(t, 1, len(cookies))
-
-		authCookie := cookies[0]
-		expectedCookie := authHelper.RemoveJWTCookie()
-		assert.Equal(t, expectedCookie.Name, authCookie.Name)
-		assert.Equal(t, time.Unix(0, 0).Unix(), authCookie.Expires.Unix())
 	})
 }

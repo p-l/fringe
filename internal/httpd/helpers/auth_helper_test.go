@@ -1,6 +1,7 @@
 package helpers_test
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -10,32 +11,18 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestAuthHelper_NewJWTCookieFromClaims(t *testing.T) {
+func TestAuthHelper_NewJWTSignedString(t *testing.T) {
 	t.Parallel()
-	t.Run("return cookie that expires with claims", func(t *testing.T) {
+	t.Run("returns single string without spaces", func(t *testing.T) {
 		t.Parallel()
 		fake := faker.New()
 
 		authHelper := helpers.NewAuthHelper("@test.com", "secret", []string{})
 
 		claims := helpers.NewAuthClaims(fake.Internet().Email(), "")
-		cookie := authHelper.NewJWTCookieFromClaims(claims)
+		token := authHelper.NewJWTSignedString(claims)
 
-		assert.Equal(t, claims.ExpiresAt, cookie.Expires.Unix())
-	})
-
-	t.Run("returns a secure cookie ", func(t *testing.T) {
-		t.Parallel()
-		fake := faker.New()
-
-		authHelper := helpers.NewAuthHelper("@test.com", "secret", []string{})
-
-		claims := helpers.NewAuthClaims(fake.Internet().Email(), "")
-		cookie := authHelper.NewJWTCookieFromClaims(claims)
-
-		assert.Equal(t, "token", cookie.Name)
-		assert.True(t, cookie.Secure)
-		assert.True(t, cookie.HttpOnly)
+		assert.NotContains(t, token, " ")
 	})
 }
 
@@ -50,9 +37,9 @@ func TestAuthHelper_AuthClaimsFromSignedToken(t *testing.T) {
 		claims := helpers.NewAuthClaims(fake.Internet().Email(), "")
 		// Force expiry to be 1 minute ago
 		claims.StandardClaims.ExpiresAt = time.Now().Add(-1 * time.Minute).Unix()
-		cookie := authHelper.NewJWTCookieFromClaims(claims)
+		token := authHelper.NewJWTSignedString(claims)
 
-		claimsFromToken, err := authHelper.AuthClaimsFromSignedToken(cookie.Value)
+		claimsFromToken, err := authHelper.AuthClaimsFromSignedToken(token)
 		assert.Nil(t, claimsFromToken)
 		assert.Error(t, err)
 		assert.Equal(t, helpers.ErrInvalidClaimsToken, err)
@@ -65,10 +52,31 @@ func TestAuthHelper_AuthClaimsFromSignedToken(t *testing.T) {
 		k1Helper := helpers.NewAuthHelper("@test.com", "key1", []string{})
 		k2Helper := helpers.NewAuthHelper("@test.com", "key2", []string{})
 
-		claims := helpers.NewAuthClaims(fake.Internet().Email(), "")
-		k1Cookie := k1Helper.NewJWTCookieFromClaims(claims)
+		k1claims := helpers.NewAuthClaims(fake.Internet().Email(), "")
+		k1token := k1Helper.NewJWTSignedString(k1claims)
 
-		claimsFromToken, err := k2Helper.AuthClaimsFromSignedToken(k1Cookie.Value)
+		claimsFromToken, err := k2Helper.AuthClaimsFromSignedToken(k1token)
+		assert.Nil(t, claimsFromToken)
+		assert.Error(t, err)
+		assert.Equal(t, helpers.ErrInvalidClaimsToken, err)
+	})
+
+	t.Run("Refuses modified string", func(t *testing.T) {
+		t.Parallel()
+		fake := faker.New()
+
+		authHelper := helpers.NewAuthHelper("@test.com", "secret", []string{})
+
+		claims := helpers.NewAuthClaims(fake.Internet().Email(), "")
+		sourceToken := authHelper.NewJWTSignedString(claims)
+
+		token := strings.ReplaceAll(sourceToken, ".", "&")
+		token = strings.ReplaceAll(token, "_", ".")
+		token = strings.ReplaceAll(token, "&", "_")
+
+		assert.NotEqual(t, sourceToken, token)
+
+		claimsFromToken, err := authHelper.AuthClaimsFromSignedToken(token)
 		assert.Nil(t, claimsFromToken)
 		assert.Error(t, err)
 		assert.Equal(t, helpers.ErrInvalidClaimsToken, err)
@@ -94,21 +102,5 @@ func TestAuthHelper_AuthClaimsFromSignedToken(t *testing.T) {
 		assert.NotNil(t, claimsFromToken)
 		assert.Equal(t, claims.Email, claimsFromToken.Email)
 		assert.Equal(t, claims.StandardClaims.ExpiresAt, claimsFromToken.StandardClaims.ExpiresAt)
-	})
-}
-
-func TestAuthHelper_RemoveJWTCookie(t *testing.T) {
-	t.Parallel()
-	t.Run("Return an expired cookie", func(t *testing.T) {
-		t.Parallel()
-
-		helper := helpers.NewAuthHelper("@test.com", "secret", []string{})
-
-		cookie := helper.RemoveJWTCookie()
-
-		assert.Equal(t, "token", cookie.Name)
-		assert.Equal(t, cookie.Expires.Unix(), time.Unix(0, 0).Unix())
-		assert.True(t, cookie.Secure)
-		assert.True(t, cookie.HttpOnly)
 	})
 }

@@ -29,7 +29,7 @@ func TestGoogleOAuthService_AuthenticateUserWithCode(t *testing.T) {
 		})
 
 		service := services.NewGoogleOAuthService(client, "client_id", "client_secret", "https://redirect.url/somewhere/callback")
-		googleUser, err := service.AuthenticateUserWithCode(context.Background(), "code")
+		googleUser, err := service.AuthenticateUserWithToken(context.Background(), "bearer", "code")
 		assert.Error(t, err)
 		assert.ErrorIs(t, err, services.ErrGoogleAuthenticationFailed)
 		assert.Nil(t, googleUser)
@@ -58,7 +58,7 @@ func TestGoogleOAuthService_AuthenticateUserWithCode(t *testing.T) {
 		})
 
 		service := services.NewGoogleOAuthService(client, "client_id", "client_secret", "https://redirect.url/somewhere/callback")
-		googleUser, err := service.AuthenticateUserWithCode(context.Background(), "code")
+		googleUser, err := service.AuthenticateUserWithToken(context.Background(), "bearer", "code")
 		assert.Error(t, err)
 		assert.ErrorIs(t, err, services.ErrGoogleAuthenticationFailed)
 		assert.Nil(t, googleUser)
@@ -87,7 +87,7 @@ func TestGoogleOAuthService_AuthenticateUserWithCode(t *testing.T) {
 		})
 
 		service := services.NewGoogleOAuthService(client, "client_id", "client_secret", "https://redirect.url/somewhere/callback")
-		googleUser, err := service.AuthenticateUserWithCode(context.Background(), "code")
+		googleUser, err := service.AuthenticateUserWithToken(context.Background(), "bearer", "code")
 		assert.Error(t, err)
 		assert.ErrorIs(t, err, services.ErrGoogleAuthenticationFailed)
 		assert.Nil(t, googleUser)
@@ -116,28 +116,9 @@ func TestGoogleOAuthService_AuthenticateUserWithCode(t *testing.T) {
 		})
 
 		service := services.NewGoogleOAuthService(client, "client_id", "client_secret", "https://redirect.url/somewhere/callback")
-		googleUser, err := service.AuthenticateUserWithCode(context.Background(), "code")
+		googleUser, err := service.AuthenticateUserWithToken(context.Background(), "bearer", "code")
 		assert.NoError(t, err)
 		assert.NotNil(t, googleUser)
 		assert.Equalf(t, "email@domain.com", googleUser.Email, "Expect userinfo email to match email in JSON")
-	})
-}
-
-func TestGoogleOAuthService_RedirectURL(t *testing.T) {
-	t.Parallel()
-	t.Run("RedirectURL Includes userinfo.email scope at minimum", func(t *testing.T) {
-		t.Parallel()
-
-		client := mocks.NewMockHTTPClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: http.StatusTeapot,
-				Body:       ioutil.NopCloser(bytes.NewBufferString(`{}`)),
-				Header:     make(http.Header),
-			}
-		})
-
-		service := services.NewGoogleOAuthService(client, "client_id", "client_secret", "https://redirect.url/somewhere/callback")
-		url := service.RedirectURL()
-		assert.Contains(t, url, "userinfo.email")
 	})
 }

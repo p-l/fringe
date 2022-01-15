@@ -1,10 +1,10 @@
 package handlers
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
 
-	"github.com/mrz1836/go-sanitize"
 	"github.com/p-l/fringe/internal/httpd/helpers"
 	"github.com/p-l/fringe/internal/httpd/services"
 )
@@ -14,6 +14,16 @@ type AuthHandler struct {
 	googleOAuth *services.GoogleOAuthService
 }
 
+type LoginRequest struct {
+	AccessToken string `json:"access_token"`
+	TokenType   string `json:"token_type"`
+}
+
+type LoginResponse struct {
+	TokenType string `json:"token_type"`
+	Token     string `json:"token"`
+}
+
 func NewAuthHandler(googleOAuthService *services.GoogleOAuthService, authHelper *helpers.AuthHelper) *AuthHandler {
 	return &AuthHandler{
 		authHelper:  authHelper,
@@ -21,15 +31,22 @@ func NewAuthHandler(googleOAuthService *services.GoogleOAuthService, authHelper 
 	}
 }
 
-// GoogleCallbackHandler handles "/auth/google/callback"
-// the path portion of the GoogleOAuthClientConfig.RedirectURI.
-func (a *AuthHandler) GoogleCallbackHandler(httpResponse http.ResponseWriter, httpRequest *http.Request) {
+// Login validates Google token and create JWT if its valid.
+func (a *AuthHandler) Login(httpResponse http.ResponseWriter, httpRequest *http.Request) {
 	defer func() { _ = httpRequest.Body.Close() }()
 
-	parsedQuery := httpRequest.URL.Query()
-	code := sanitize.SingleLine(parsedQuery.Get("code"))
+	var data LoginRequest
+	decoder := json.NewDecoder(httpRequest.Body)
 
-	googleUserInfo, err := a.googleOAuth.AuthenticateUserWithCode(httpRequest.Context(), code)
+	err := decoder.Decode(&data)
+	if err != nil {
+		log.Printf("Auth [src:%v] invalid post data %v", httpRequest.RemoteAddr, err)
+		http.Error(httpResponse, "Unable to validate code", http.StatusUnauthorized)
+
+		return
+	}
+
+	googleUserInfo, err := a.googleOAuth.AuthenticateUserWithToken(httpRequest.Context(), data.TokenType, data.AccessToken)
 	if err != nil {
 		log.Printf("Auth [src:%v] invalid token %v", httpRequest.RemoteAddr, err)
 		http.Error(httpResponse, "Unable to validate code", http.StatusUnauthorized)
@@ -46,18 +63,23 @@ func (a *AuthHandler) GoogleCallbackHandler(httpResponse http.ResponseWriter, ht
 
 	permissions := a.authHelper.PermissionsForEmail(googleUserInfo.Email)
 	claims := helpers.NewAuthClaims(googleUserInfo.Email, permissions)
-	cookie := a.authHelper.NewJWTCookieFromClaims(claims)
-	http.SetCookie(httpResponse, cookie)
-	http.Redirect(httpResponse, httpRequest, "/", http.StatusFound)
-}
+	signedTokenString := a.authHelper.NewJWTSignedString(claims)
 
-// RootHandler handles "/auth"
-// Redirect to Google Authentication page for the moment.
-// NOTE: When more than one OAuth provider is supported the behaviour will change.
-func (a *AuthHandler) RootHandler(httpResponse http.ResponseWriter, httpRequest *http.Request) {
-	defer func() { _ = httpRequest.Body.Close() }()
+	response := LoginResponse{TokenType: "Bearer", Token: signedTokenString}
 
-	googleAuthURL := a.googleOAuth.RedirectURL()
+	jsonResponse, err := json.Marshal(response)
+	if err != nil {
+		log.Printf("Auth [src:%v] failed to encode token (for %s): %v", httpRequest.RemoteAddr, claims.Email, err)
+		http.Error(httpResponse, err.Error(), http.StatusInternalServerError)
 
-	http.Redirect(httpResponse, httpRequest, googleAuthURL, http.StatusFound)
+		return
+	}
+
+	httpResponse.Header().Set("Content-Type", "application/json")
+
+	_, err = httpResponse.Write(jsonResponse)
+	if err != nil {
+		log.Printf("Auth [src:%v] failed to send response token for %s: %v", httpRequest.RemoteAddr, claims.Email, err)
+		http.Error(httpResponse, err.Error(), http.StatusInternalServerError)
+	}
 }
