@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Inspired from:
-# https://github.com/influxdata/fringe/blob/c80c3636dd7bba6c3d0f3d6a1c321862da8f201a/releng/packages/fs/usr/local/bin/fringe_packages.bash
+# https://github.com/influxdata/influxdb/blob/bae5679c2ef1b3b96b21e5bd887c9dc7860a3f8a/package.sh
 set -e
 
 PACKAGES_DIR="artifacts"
