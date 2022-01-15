@@ -1,34 +1,40 @@
-import React from 'react';
-import Container from '@mui/material/Container';
-import Typography from '@mui/material/Typography';
-import Box from '@mui/material/Box';
-import LightBulbIcon from '@mui/icons-material/Lightbulb';
+import React, {Suspense} from 'react';
+import {Route, Routes} from 'react-router-dom';
+import {Box, CircularProgress, Container} from '@mui/material';
+
+import ErrorBoundary from '../@component/error-boundary';
+import AuthProvider from '../@component/auth-provider';
+import RequireAuth from '../@component/require-auth';
+import {useAuthService} from '../../services/auth';
+import Home from '../home';
+import Login from '../login';
 import Config from '../../config';
 
-
-interface AppProps {
+interface ApplicationProps {
     config: Config
 }
 
-function InfoLine(props: AppProps) {
-  return (
-    <Typography sx={{mt: 6, mb: 3}} color="text.secondary">
-      <LightBulbIcon sx={{mr: 1, verticalAlign: 'middle'}} />
-      API URL: {props.config.apiURL}
-    </Typography>
-  );
-}
+function Application(props: ApplicationProps) {
+  const authService = useAuthService();
+  authService.authApiRootURL = `${props.config.apiURL}/auth/`;
 
-function Application(props: AppProps) {
   return (
-    <Container maxWidth="sm">
-      <Box sx={{my: 4}}>
-        <Typography variant="h4" component="h1" gutterBottom>
-          Client ready to implement
-        </Typography>
-        <InfoLine config={props.config}/>
-      </Box>
-    </Container>
+    <ErrorBoundary>
+      <Suspense fallback={
+        <Container component="main" maxWidth="xs">
+          <Box sx={{p: 50, m: 50, display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
+            <CircularProgress />
+          </Box>
+        </Container>
+      }>
+        <AuthProvider>
+          <Routes>
+            <Route path="/" element={<RequireAuth><Home config={props.config} /></RequireAuth>} />
+            <Route path="/login" element={<Login googleClientID={props.config.googleClientID} />} />
+          </Routes>
+        </AuthProvider>
+      </Suspense>
+    </ErrorBoundary>
   );
 }
 

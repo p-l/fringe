@@ -27,13 +27,15 @@ help: ## 💬 This help message
 lint: ## 🔎 Lint & format, will not fix but sets exit code on error
 	golangci-lint run --modules-download-mode=mod ./...
 	cd $(CLIENT_DIR); npx eslint "src/**/*.ts" "src/**/*.tsx" "typings/*.ts"
-	cd $(CLIENT_DIR); npx stylelint "**/*.css"
+	@# No app specific CSS at the moment
+	@# cd $(CLIENT_DIR); npx stylelint "**/*.css"
 
 .PHONY: lint-fix
 lint-fix: ## 📜 Lint & format, will try to fix errors and modify code
 	golangci-lint run --modules-download-mode=mod --fix ./...
 	cd $(CLIENT_DIR); npx eslint --fix "src/**/*.ts" "src/**/*.tsx" "typings/*.ts"
-	cd $(CLIENT_DIR); npx stylelint --fix "src/**/*.css" "public/**/*.css"
+	@# No app specific CSS at the moment
+	@# cd $(CLIENT_DIR); npx stylelint --fix "src/**/*.css" "public/**/*.css"
 
 .PHONY: dep
 dep: ## 📥 Download and install dependencies
@@ -46,7 +48,7 @@ dep: ## 📥 Download and install dependencies
 
 .PHONY: watch
 watch: ## 👀 Run Fringe go server and independent react service with hot reload file watcher, needs https://github.com/cosmtrek/air
-	cd $(CLIENT_DIR); npx concurrently "cd ..; air -c .air.toml" "npm run start" "npm run test:watch"
+	cd $(CLIENT_DIR); npx concurrently "cd ..; air -c .air.toml" "npm run start" # "npm run test:watch"
 
 .PHONY: build
 build: dep ## 🔨 Build and bundle the server with the client built-in

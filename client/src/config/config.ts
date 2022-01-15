@@ -1,30 +1,50 @@
 import axios from 'axios';
 
+
 class Config {
+  state: {
+    loaded: boolean;
+    error: Error | null;
+  };
+
   apiURL: string;
-  loaded: boolean;
-  google_client_id: string;
+  googleClientID: string;
 
-  constructor(apiURL: string) {
-    this.apiURL = apiURL || '';
-    this.google_client_id = '';
-    this.loaded = false;
+  public constructor() {
+    this.state = {
+      loaded: false,
+      error: null,
+    };
 
-    if (apiURL != '') {
-      const configURL = this.apiURL + '/config/';
-      console.debug('Getting client configuration from:' + configURL);
-      axios.get(configURL).then((r) => {
-        if (!r.data['google_client_id']) return;
+    this.apiURL = '';
+    this.googleClientID = '';
+  }
 
-        console.debug('Valid config from:' + configURL);
-        this.google_client_id = r.data['google_client_id'];
-        this.loaded = true;
-      }).catch((e) => {
-        console.log(e); // e can be anything, really.
-      });
-    }
+  waitForConfigFromAPI(apiRootURL: string, loaded: ConfigLoaded) {
+    console.log('Loading configuration from: '+apiRootURL);
+    const configURL = apiRootURL + '/config/';
+    console.debug('Getting client configuration from: ' + apiRootURL);
+    axios.get(configURL).then((r) => {
+      // Minimal keys required for config to be deemed valid
+      if (!r.data['google_client_id']) throw Error('Invalid configuration file. (Missing `google_client_id`)');
+
+      console.debug('Valid config from:' + configURL);
+
+      this.apiURL = apiRootURL;
+      this.googleClientID = r.data['google_client_id'];
+
+      loaded(this);
+    }).catch((e) => {
+      this.state.loaded = false;
+      this.state.error = e;
+
+      console.log('Config loading failed: '+e); // e can be anything, really.
+      loaded(this);
+    });
   }
 }
+
+type ConfigLoaded = (config: Config) => any;
 
 
 // tslint:disable-next-line no-var-requires prefer-template

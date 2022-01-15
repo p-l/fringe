@@ -47,8 +47,8 @@ func makeRequestToHandlerWithClaims(claims *helpers.AuthClaims, path string, han
 	authHelper := helpers.NewAuthHelper("test.com", "secret", []string{adminEmail})
 
 	if claims != nil {
-		tokenCookie := authHelper.NewJWTCookieFromClaims(claims)
-		req.AddCookie(tokenCookie)
+		token := authHelper.NewJWTSignedString(claims)
+		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
 	}
 
 	authMiddleware := middlewares.NewAuthMiddleware("/auth", []string{"/"}, []string{}, authHelper)
