@@ -29,6 +29,14 @@ jobs:
       with:
         go-version: 1.17
 
+    - name: Setup Node.js
+      uses: actions/setup-node@v2
+      with:
+        node-version: '16.x'
+
+    - name: Download Dependencies
+      run: make dep
+
     - name: Run Gosec Security Scanner
       uses: securego/gosec@master
       with:

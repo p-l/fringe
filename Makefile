@@ -41,6 +41,7 @@ lint-fix: ## 📜 Lint & format, will try to fix errors and modify code
 dep: ## 📥 Download and install dependencies
 	mkdir -p $(BUILD_BIN_DIR)
 	mkdir -p $(BUILD_CLIENT_DIST_DIR)
+	touch $(BUILD_CLIENT_DIST_DIR)/.tmp
 	go mod download
 	cd $(CLIENT_DIR); npm install --silent
 
