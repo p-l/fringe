@@ -37,3 +37,6 @@ vendor/
 
 # Development Certs
 /certs/
+
+# Node Modules
+node_modules/
