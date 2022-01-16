@@ -22,7 +22,7 @@ class Config {
 
   waitForConfigFromAPI(apiRootURL: string, loaded: ConfigLoaded) {
     console.log('Loading configuration from: '+apiRootURL);
-    const configURL = apiRootURL + '/config/';
+    const configURL = apiRootURL + (apiRootURL.slice(-1) == '/' ? '' : '/') + 'config/';
     console.debug('Getting client configuration from: ' + apiRootURL);
     axios.get(configURL).then((r) => {
       // Minimal keys required for config to be deemed valid
