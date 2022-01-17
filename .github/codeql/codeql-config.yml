@@ -1,0 +1,9 @@
+name: "Fringe CodeQL config"
+queries:
+  - uses: security-and-quality
+
+paths-ignore:
+  - client/build
+  - client/node_modules
+  - '**/*_test.go'
+  - '**/*.test.js'
