@@ -58,7 +58,7 @@ jobs:
     - name: Upload Code Coverage
       uses: codecov/codecov-action@v2
       with:
-        token: ${{ secrets.CODECOV_TOKEN }} # not required for public repos
-        files: ./coverage.txt               # optional
+        token: ${{ secrets.CODECOV_TOKEN }}
+        files: ./coverage.txt,./client/coverage/coverage-final.json
         fail_ci_if_error: true              # optional (default = false)
         verbose: true                       # optional (default = false)
