@@ -11,7 +11,7 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import {BrowserRouter as Router} from 'react-router-dom';
 
-import Application from './ui/appllication';
+import Application from './ui/application';
 import Config from './config';
 
 const apiRootURL = (process.env.REACT_APP_API_URL? process.env.REACT_APP_API_URL : '/api');
