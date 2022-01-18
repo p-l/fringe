@@ -5,7 +5,7 @@ import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import LightBulbIcon from '@mui/icons-material/Lightbulb';
 
-import Config from '../../config';
+import Config from '../../services/config';
 import {GoogleLogout} from 'react-google-login';
 import {useNavigate} from 'react-router-dom';
 import {useAuth} from '../@contexts/auth';
@@ -37,6 +37,6 @@ function Home({config}: {config: Config}) {
       </Box>
     </Container>
   );
-};
+}
 
 export default Home;

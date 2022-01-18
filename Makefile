@@ -6,7 +6,6 @@ BUILD_BIN_DIR = "bin"
 BUILD_BIN_FILE := fringe-server
 
 RUN_DB_DIR = "db"
-RUN_CERTS_DIR = "certs"
 
 FRINGE_VERSION = $(shell cat VERSION)-$(shell git rev-parse --short HEAD)
 CLIENT_VERSION = $(shell cat $(CLIENT_DIR)/package.json | grep version | head -1 | awk -F: '{ print $$2 }' | sed 's/[",]//g' | sed 's/^[ \t]*//;s/[ \t]*$$//')
@@ -46,7 +45,8 @@ dep: ## 📥 Download and install dependencies
 	cd $(CLIENT_DIR); npm install --silent
 
 .PHONY: watch
-watch: ## 👀 Run Fringe go server and independent react service with hot reload file watcher, needs https://github.com/cosmtrek/air
+watch: dep ## 👀 Run Fringe go server and independent react service with hot reload file watcher, needs https://github.com/cosmtrek/air
+	mkdir -p $(RUN_DB_DIR)
 	cd $(CLIENT_DIR); npx concurrently "cd ..; air -c .air.toml" "npm run start" # "npm run test:watch"
 
 .PHONY: build

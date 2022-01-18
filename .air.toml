@@ -15,7 +15,7 @@ bin = "bin/fringe-server-air"
 # Watch these filename extensions.
 include_ext = ["go", "gohtml", "css", "toml"]
 # Ignore these filename extensions or directories.
-exclude_dir = ["tmp", "config", "packages", "db", "vendor", "scripts", "system", "client" ]
+exclude_dir = ["tmp", "config", "packages", "db", "vendor", "scripts", "system", "client", "internal/mocks", "node_modules" ]
 # Watch these directories if you specified.
 include_dir = []
 # Exclude files.

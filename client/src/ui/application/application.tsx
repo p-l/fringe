@@ -8,7 +8,7 @@ import RequireAuth from '../@component/require-auth';
 import {useAuthService} from '../../services/auth';
 import Home from '../home';
 import Login from '../login';
-import Config from '../../config';
+import Config from '../../services/config';
 
 interface ApplicationProps {
     config: Config
@@ -16,7 +16,7 @@ interface ApplicationProps {
 
 function Application(props: ApplicationProps) {
   const authService = useAuthService();
-  authService.authApiRootURL = `${props.config.apiURL}/auth/`;
+  authService.apiRootURL = props.config.apiRootURL;
 
   return (
     <ErrorBoundary>
