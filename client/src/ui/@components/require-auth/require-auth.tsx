@@ -4,9 +4,8 @@ import {useAuth} from '../../@contexts/auth';
 
 function RequireAuth({children}: {children: JSX.Element}) {
   const auth = useAuth();
-  console.log('RequireAuth!');
 
-  if (!auth.userAuth) {
+  if (!auth.authenticated) {
     return <Navigate to="/login" replace />;
   }
 

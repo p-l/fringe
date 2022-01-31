@@ -15,7 +15,7 @@ class Config {
       error: null,
     };
 
-    this.apiRootURL = '/api/';
+    this.apiRootURL = 'https://'+window.location.host+'/api/';
     this.googleClientID = '';
   }
 
@@ -24,7 +24,7 @@ class Config {
   }
 
   waitForConfigFromAPI(loaded: (success: boolean, config: Config) => void) {
-    console.debug('Getting client configuration from: ' + this.configApiURL());
+    console.debug('⚙️ Getting client configuration from: ' + this.configApiURL());
     axios.get(this.configApiURL()).then((r) => {
       // Minimal keys required for config to be deemed valid
       if (!r.data['google_client_id']) {
@@ -39,7 +39,7 @@ class Config {
       this.state.error = null;
       this.googleClientID = r.data['google_client_id'];
 
-      console.debug('Loaded config from:' + this.configApiURL());
+      console.debug('⚙️ Loaded config from:' + this.configApiURL());
       loaded(true, this);
     }).catch((e) => {
       this.state.loaded = false;

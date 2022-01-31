@@ -4,14 +4,17 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/p-l/fringe/internal/httpd/helpers"
 	"github.com/p-l/fringe/internal/httpd/services"
+	"github.com/p-l/fringe/internal/repos"
 )
 
 type AuthHandler struct {
 	authHelper  *helpers.AuthHelper
 	googleOAuth *services.GoogleOAuthService
+	userRepo    *repos.UserRepository
 }
 
 type LoginRequest struct {
@@ -22,12 +25,14 @@ type LoginRequest struct {
 type LoginResponse struct {
 	TokenType string `json:"token_type"`
 	Token     string `json:"token"`
+	Duration  int64  `json:"duration"`
 }
 
-func NewAuthHandler(googleOAuthService *services.GoogleOAuthService, authHelper *helpers.AuthHelper) *AuthHandler {
+func NewAuthHandler(userRepo *repos.UserRepository, googleOAuthService *services.GoogleOAuthService, authHelper *helpers.AuthHelper) *AuthHandler {
 	return &AuthHandler{
 		authHelper:  authHelper,
 		googleOAuth: googleOAuthService,
+		userRepo:    userRepo,
 	}
 }
 
@@ -62,10 +67,11 @@ func (a *AuthHandler) Login(httpResponse http.ResponseWriter, httpRequest *http.
 	}
 
 	permissions := a.authHelper.PermissionsForEmail(googleUserInfo.Email)
-	claims := helpers.NewAuthClaims(googleUserInfo.Email, permissions)
+	claims := helpers.NewAuthClaims(googleUserInfo.Email, googleUserInfo.Name, googleUserInfo.Picture, permissions)
 	signedTokenString := a.authHelper.NewJWTSignedString(claims)
+	duration := time.Unix(claims.ExpiresAt, 0).Unix() - time.Now().Unix()
 
-	response := LoginResponse{TokenType: "Bearer", Token: signedTokenString}
+	response := LoginResponse{TokenType: "Bearer", Token: signedTokenString, Duration: duration}
 
 	jsonResponse, err := json.Marshal(response)
 	if err != nil {
@@ -81,5 +87,10 @@ func (a *AuthHandler) Login(httpResponse http.ResponseWriter, httpRequest *http.
 	if err != nil {
 		log.Printf("Auth [src:%v] failed to send response token for %s: %v", httpRequest.RemoteAddr, claims.Email, err)
 		http.Error(httpResponse, err.Error(), http.StatusInternalServerError)
+
+		return
 	}
+
+	// try to update the profile if the user exists
+	_, _ = a.userRepo.UpdateProfile(claims.Email, claims.Name, claims.Picture)
 }

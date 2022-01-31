@@ -1,6 +1,6 @@
 import React from 'react';
 import {useNavigate} from 'react-router-dom';
-import {Box, Button, Container, Typography} from '@mui/material';
+import {Box, Button, Container, Paper, Typography} from '@mui/material';
 import GoogleIcon from '@mui/icons-material/Google';
 import GoogleLogin, {GoogleLoginResponse, GoogleLoginResponseOffline} from 'react-google-login';
 import {useAuth} from '../@contexts/auth';
@@ -16,9 +16,9 @@ function Login({googleClientID} : {googleClientID: string}) {
       const token = response.accessToken;
       const tokenType = 'Bearer';
 
-      auth.login(token, tokenType, (success, auth)=>{
-        if (success) {
-          console.log('Authentication done! Navigating to /');
+      auth.login(token, tokenType, (authenticate)=>{
+        if (authenticate) {
+          console.debug('Authentication was a success. Navigating to /');
           navigate('/', {replace: true});
         } else {
           // TODO: Display error banner
@@ -35,24 +35,13 @@ function Login({googleClientID} : {googleClientID: string}) {
     console.log(error);
   };
 
-  console.log('ClientID:'+googleClientID);
   return (
     <Container component="main" maxWidth="xs">
-      <Box sx={{
-        boxShadow: 2,
-        marginTop: 10,
-        p: 2,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-      }}>
-        <Box sx={{
-          m: 2,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-        }}>
-          <img alt="fringe logo" src="/logo/logo.svg" width={128}/>
+      <Paper sx={{marginTop: 10, p: 2, display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
+        <Box sx={{m: 2, display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
+          <img alt="fringe logo" src="/logo/logo-blue.svg" width={128}/>
+        </Box>
+        <Box sx={{marginBottom: 2}}>
           <Typography component="h1" variant="h5">
             Welcome to Fringe
           </Typography>
@@ -68,7 +57,7 @@ function Login({googleClientID} : {googleClientID: string}) {
               </Button>
             )} />
         </Box>
-      </Box>
+      </Paper>
     </Container>
   );
 }

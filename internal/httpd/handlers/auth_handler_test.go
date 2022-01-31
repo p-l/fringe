@@ -33,8 +33,9 @@ func TestAuthHandler_Login(t *testing.T) {
 
 		googleOAuth := services.NewGoogleOAuthService(client, "id", "secret", "callback")
 		authHelper := helpers.NewAuthHelper("test.com", "secret", []string{})
+		userRepo := mocks.NewMockUserRepository(t)
 
-		authHandler := handlers.NewAuthHandler(googleOAuth, authHelper)
+		authHandler := handlers.NewAuthHandler(userRepo, googleOAuth, authHelper)
 
 		loginRequest := handlers.LoginRequest{
 			AccessToken: "test_token",
@@ -66,15 +67,15 @@ func TestAuthHandler_Login(t *testing.T) {
 			return &http.Response{
 				StatusCode: http.StatusOK,
 				Body: ioutil.NopCloser(bytes.NewBufferString(
-					`{ "sub": "a_sub", "email": "email@test.com", "email_verified": true, "picture": "https://profile/picture/url", "hd": "domain.com" }`)),
+					`{ "sub": "a_sub", "email": "email@test.com", "email_verified": true, "picture": "https://profile/picture/url", "name": "Person Name", "hd": "domain.com" }`)),
 				Header: make(http.Header),
 			}
 		})
 
 		googleOAuth := services.NewGoogleOAuthService(client, "id", "secret", "callback")
 		authHelper := helpers.NewAuthHelper("test.com", "secret", []string{})
-
-		authHandler := handlers.NewAuthHandler(googleOAuth, authHelper)
+		userRepo := mocks.NewMockUserRepository(t)
+		authHandler := handlers.NewAuthHandler(userRepo, googleOAuth, authHelper)
 
 		loginRequest := handlers.LoginRequest{
 			AccessToken: "test_token",

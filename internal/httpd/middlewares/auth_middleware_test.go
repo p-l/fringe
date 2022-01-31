@@ -17,7 +17,7 @@ import (
 func TestEnsureAuth(t *testing.T) {
 	t.Parallel()
 
-	t.Run("redirect to AuthPath if no token is present", func(t *testing.T) {
+	t.Run("Refuse Access to AuthPath if no token is present", func(t *testing.T) {
 		t.Parallel()
 
 		authPath := "/test/auth"
@@ -35,11 +35,7 @@ func TestEnsureAuth(t *testing.T) {
 		router.HandleFunc(authPath, func(writer http.ResponseWriter, request *http.Request) {})
 		router.ServeHTTP(res, req)
 
-		assert.Equal(t, http.StatusFound, res.Result().StatusCode)
-
-		target, err := res.Result().Location()
-		assert.Nil(t, err)
-		assert.Equal(t, authPath, target.Path)
+		assert.Equal(t, http.StatusForbidden, res.Result().StatusCode)
 	})
 
 	t.Run("skips token validation path in excludedPath", func(t *testing.T) {
@@ -77,7 +73,7 @@ func TestEnsureAuth(t *testing.T) {
 		authHelper := helpers.NewAuthHelper("@test.com", "secret", []string{})
 		authMiddleware := middlewares.NewAuthMiddleware("/auth/", []string{"/"}, []string{"/no-auth"}, authHelper)
 
-		validClaims := helpers.NewAuthClaims(fake.Internet().Email(), "")
+		validClaims := helpers.NewAuthClaims(fake.Internet().Email(), fake.Person().Name(), fake.Internet().URL(), "")
 		// Force expiry to be 1 minute in the future
 		validClaims.StandardClaims.ExpiresAt = time.Now().Add(1 * time.Minute).Unix()
 		validToken := authHelper.NewJWTSignedString(validClaims)
@@ -105,7 +101,7 @@ func TestEnsureAuth(t *testing.T) {
 		authHelper := helpers.NewAuthHelper("@test.com", "secret", []string{})
 		authMiddleware := middlewares.NewAuthMiddleware(authPath, []string{"/"}, []string{"/no-auth"}, authHelper)
 
-		validClaims := helpers.NewAuthClaims(fake.Internet().Email(), "")
+		validClaims := helpers.NewAuthClaims(fake.Internet().Email(), fake.Person().Name(), fake.Internet().URL(), "")
 		// Force expiry to be 1 minute ago
 		validClaims.StandardClaims.ExpiresAt = time.Now().Add(-1 * time.Minute).Unix()
 		validToken := authHelper.NewJWTSignedString(validClaims)
@@ -121,11 +117,6 @@ func TestEnsureAuth(t *testing.T) {
 		})
 		router.ServeHTTP(res, req)
 
-		assert.Equal(t, http.StatusFound, res.Result().StatusCode)
-
-		// Ensure redirected to Auth path
-		target, err := res.Result().Location()
-		assert.Nil(t, err)
-		assert.Equal(t, authPath, target.Path)
+		assert.Equal(t, http.StatusForbidden, res.Result().StatusCode)
 	})
 }

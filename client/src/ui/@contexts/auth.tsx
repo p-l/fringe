@@ -1,9 +1,8 @@
 import React from 'react';
-import {UserAuth} from '../../types/user-auth';
 
 interface AuthContextType {
-  userAuth: UserAuth|null;
-  login: (token: string, tokenType: string, callback: (success: boolean, auth: UserAuth|null) => void) => void;
+  authenticated: boolean;
+  login: (tokenType: string, token: string, callback: (authenticated: boolean) => void) => void;
   logout: (callback: VoidFunction) => void;
 }
 

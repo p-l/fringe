@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 
 	"github.com/p-l/fringe/internal/httpd/helpers"
@@ -20,8 +21,14 @@ type GoogleOAuthService struct {
 
 type GoogleUserInfo struct {
 	Sub           string `json:"sub"`
+	Name          string `json:"name"`
+	GivenName     string `json:"given_name"`
+	FamilyName    string `json:"family_name"`
+	Profile       string `json:"profile"`
+	Picture       string `json:"picture"`
 	Email         string `json:"email"`
 	VerifiedEmail bool   `json:"verified_email"`
+	HD            string `json:"hd"`
 }
 
 var ErrGoogleAuthenticationFailed = errors.New("invalid response from google API")
@@ -34,6 +41,8 @@ func NewGoogleOAuthService(httpClient *http.Client, clientID string, clientSecre
 		httpClient:        httpClient,
 	}
 }
+
+//
 
 func (g *GoogleOAuthService) fetchGoogleUserInfoWithToken(ctx context.Context, tokenType string, token string) (userInfo *GoogleUserInfo, err error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", "https://openidconnect.googleapis.com/v1/userinfo", nil)
@@ -58,6 +67,8 @@ func (g *GoogleOAuthService) fetchGoogleUserInfoWithToken(ctx context.Context, t
 	if err != nil {
 		return nil, fmt.Errorf("failed to read userinfo: %w", err)
 	}
+
+	log.Printf("Google Reply: %s", body)
 
 	var googleUserInfo GoogleUserInfo
 

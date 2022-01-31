@@ -19,7 +19,7 @@ func TestAuthHelper_NewJWTSignedString(t *testing.T) {
 
 		authHelper := helpers.NewAuthHelper("@test.com", "secret", []string{})
 
-		claims := helpers.NewAuthClaims(fake.Internet().Email(), "")
+		claims := helpers.NewAuthClaims(fake.Internet().Email(), fake.Person().Name(), fake.Internet().URL(), "")
 		token := authHelper.NewJWTSignedString(claims)
 
 		assert.NotContains(t, token, " ")
@@ -34,7 +34,7 @@ func TestAuthHelper_AuthClaimsFromSignedToken(t *testing.T) {
 
 		authHelper := helpers.NewAuthHelper("@test.com", "secret", []string{})
 
-		claims := helpers.NewAuthClaims(fake.Internet().Email(), "")
+		claims := helpers.NewAuthClaims(fake.Internet().Email(), fake.Person().Name(), fake.Internet().URL(), "")
 		// Force expiry to be 1 minute ago
 		claims.StandardClaims.ExpiresAt = time.Now().Add(-1 * time.Minute).Unix()
 		token := authHelper.NewJWTSignedString(claims)
@@ -52,7 +52,7 @@ func TestAuthHelper_AuthClaimsFromSignedToken(t *testing.T) {
 		k1Helper := helpers.NewAuthHelper("@test.com", "key1", []string{})
 		k2Helper := helpers.NewAuthHelper("@test.com", "key2", []string{})
 
-		k1claims := helpers.NewAuthClaims(fake.Internet().Email(), "")
+		k1claims := helpers.NewAuthClaims(fake.Internet().Email(), fake.Person().Name(), fake.Internet().URL(), "")
 		k1token := k1Helper.NewJWTSignedString(k1claims)
 
 		claimsFromToken, err := k2Helper.AuthClaimsFromSignedToken(k1token)
@@ -67,7 +67,7 @@ func TestAuthHelper_AuthClaimsFromSignedToken(t *testing.T) {
 
 		authHelper := helpers.NewAuthHelper("@test.com", "secret", []string{})
 
-		claims := helpers.NewAuthClaims(fake.Internet().Email(), "")
+		claims := helpers.NewAuthClaims(fake.Internet().Email(), fake.Person().Name(), fake.Internet().URL(), "")
 		sourceToken := authHelper.NewJWTSignedString(claims)
 
 		token := strings.ReplaceAll(sourceToken, ".", "&")
@@ -87,7 +87,7 @@ func TestAuthHelper_AuthClaimsFromSignedToken(t *testing.T) {
 		fake := faker.New()
 		secret := fake.Internet().Password()
 
-		claims := helpers.NewAuthClaims(fake.Internet().Email(), "")
+		claims := helpers.NewAuthClaims(fake.Internet().Email(), fake.Person().Name(), fake.Internet().URL(), "")
 
 		token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 		jwtKey := []byte(secret)

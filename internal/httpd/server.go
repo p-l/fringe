@@ -41,7 +41,7 @@ func NewHTTPServer(config system.Config, repo *repos.UserRepository, templates f
 	authMiddleware := middlewares.NewAuthMiddleware("/auth/", []string{"/api"}, []string{"/api/auth/", "/api/config/"}, authHelper)
 
 	homeHandler := handlers.NewDefaultHandler(repo, pageHelper)
-	authHandler := handlers.NewAuthHandler(googleOAuth, authHelper)
+	authHandler := handlers.NewAuthHandler(repo, googleOAuth, authHelper)
 	userHandler := handlers.NewUserHandler(repo, authHelper, pageHelper)
 	configHandler := handlers.NewConfigHandler(config.OAuth.Google)
 
@@ -53,11 +53,10 @@ func NewHTTPServer(config system.Config, repo *repos.UserRepository, templates f
 	router.HandleFunc("/api/", homeHandler.Root).Methods(http.MethodGet)
 	router.HandleFunc("/api/auth/", authHandler.Login).Methods(http.MethodPost)
 	router.HandleFunc("/api/config/", configHandler.Root).Methods(http.MethodGet)
-	router.HandleFunc("/api/user/", userHandler.List).Methods("GET")
-	router.HandleFunc("/api/user/{email}/", userHandler.View).Methods(http.MethodGet, http.MethodDelete)
-	router.HandleFunc("/api/user/{email}/enroll", userHandler.Enroll).Methods(http.MethodGet)
-	router.HandleFunc("/api/user/{email}/password", userHandler.Renew).Methods(http.MethodGet)
-	router.HandleFunc("/api/user/{email}/delete", userHandler.Delete).Methods(http.MethodGet)
+	router.HandleFunc("/api/users/", userHandler.List).Methods("GET")
+	router.HandleFunc("/api/users/{email}/", userHandler.View).Methods(http.MethodGet)
+	router.HandleFunc("/api/users/{email}/", userHandler.Delete).Methods(http.MethodDelete)
+	router.HandleFunc("/api/users/{email}/renew/", userHandler.Renew).Methods(http.MethodGet)
 
 	// Serve the web client
 	if len(config.Web.ReverseProxy) == 0 {

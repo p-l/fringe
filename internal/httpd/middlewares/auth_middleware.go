@@ -63,7 +63,7 @@ func (a *AuthMiddleware) EnsureAuth(next http.Handler) http.Handler {
 		token, err := extractBearerTokenFromAuthorization(authorization)
 		if err != nil {
 			log.Printf("Auth [src:%v] %s requested without valid Bearer token, redirecting to %s: %v", httpRequest.RemoteAddr, sanitize.URL(uri.Path), a.AuthPath, err)
-			http.Redirect(httpResponse, httpRequest, a.AuthPath, http.StatusFound)
+			http.Error(httpResponse, "Invalid token", http.StatusForbidden)
 
 			return
 		}
@@ -71,7 +71,7 @@ func (a *AuthMiddleware) EnsureAuth(next http.Handler) http.Handler {
 		claims, err := a.authHelper.AuthClaimsFromSignedToken(token)
 		if err != nil {
 			log.Printf("Auth [src:%v] %v ", httpRequest.RemoteAddr, err)
-			http.Redirect(httpResponse, httpRequest, a.AuthPath, http.StatusFound)
+			http.Error(httpResponse, "Invalid claims", http.StatusForbidden)
 
 			return
 		}

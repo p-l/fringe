@@ -32,7 +32,7 @@ func NewMockUserRepository(t *testing.T) *repos.UserRepository {
 
 	// Create 5 fake users
 	for i := 0; i < 5; i++ {
-		_, err = userRepo.CreateUser(fake.Internet().Email(), fake.Internet().Password())
+		_, err = userRepo.Create(fake.Internet().Email(), fake.Person().Name(), fake.Internet().URL(), fake.Internet().Password())
 		if err != nil {
 			t.Fatalf("NewMockUserRepository: Could not initate user repository: %v", err)
 		}

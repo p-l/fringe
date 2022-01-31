@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/gorilla/mux"
+	"github.com/jaswdr/faker"
 	"github.com/p-l/fringe/internal/httpd/handlers"
 	"github.com/p-l/fringe/internal/httpd/helpers"
 	"github.com/p-l/fringe/internal/httpd/middlewares"
@@ -24,10 +25,11 @@ const (
 func createUserHandler(t *testing.T) (*handlers.UserHandler, *repos.UserRepository) {
 	t.Helper()
 
+	fake := faker.New()
 	userRepo := mocks.NewMockUserRepository(t)
 
 	for _, email := range []string{adminEmail, regularUserEmail} {
-		_, err := userRepo.CreateUser(email, "test_pass")
+		_, err := userRepo.Create(email, fake.Person().Name(), fake.Internet().URL(), fake.Internet().Password())
 		if err != nil {
 			t.Fatalf("Could not add admin user to test database: %v", err)
 		}
@@ -119,7 +121,7 @@ func TestUserHandler_Delete(t *testing.T) {
 		}
 
 		// User is in the DB
-		user, err := userRepo.UserWithEmail(regularUserEmail)
+		user, err := userRepo.FindByEmail(regularUserEmail)
 		assert.NoError(t, err)
 		assert.Equal(t, regularUserEmail, user.Email)
 
@@ -132,7 +134,7 @@ func TestUserHandler_Delete(t *testing.T) {
 		assert.Contains(t, location.Path, "/user/")
 
 		// User nolonger in database
-		user, err = userRepo.UserWithEmail(regularUserEmail)
+		user, err = userRepo.FindByEmail(regularUserEmail)
 		assert.ErrorIs(t, err, repos.ErrUserNotFound)
 		assert.Nil(t, user)
 	})
@@ -185,76 +187,9 @@ func TestUserHandler_View(t *testing.T) {
 		// View
 		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/user/%s/", adminEmail), nil)
 		res := makeRequestToHandlerWithClaims(&claims, "/user/{email}/", userHandler.View, req)
-		location, _ := res.Result().Location()
 
-		// Redirect to user page
-		assert.Equal(t, http.StatusFound, res.Result().StatusCode)
-		assert.Contains(t, location.Path, regularUserEmail)
-	})
-}
-
-func TestUserHandler_Enroll(t *testing.T) {
-	t.Parallel()
-
-	t.Run("Admin can enroll new users", func(t *testing.T) {
-		t.Parallel()
-
-		userHandler, userRepo := createUserHandler(t)
-		claims := helpers.AuthClaims{
-			Email:       adminEmail,
-			Permissions: "admin",
-		}
-
-		// Make sure user doesn't exist
-		err := userRepo.DeleteUser(regularUserEmail)
-		assert.NoError(t, err)
-
-		// Enroll
-		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/user/%s/enroll", regularUserEmail), nil)
-		res := makeRequestToHandlerWithClaims(&claims, "/user/{email}/enroll", userHandler.Enroll, req)
-		cacheControl := res.Result().Header.Get("Cache-Control")
-
-		assert.Equal(t, http.StatusOK, res.Result().StatusCode)
-		assert.Equal(t, "no-store, no-cache, must-revalidate", cacheControl)
-	})
-
-	t.Run("User can enroll self", func(t *testing.T) {
-		t.Parallel()
-
-		userHandler, userRepo := createUserHandler(t)
-		claims := helpers.AuthClaims{
-			Email:       regularUserEmail,
-			Permissions: "",
-		}
-
-		// Make sure user doesn't exist
-		err := userRepo.DeleteUser(regularUserEmail)
-		assert.NoError(t, err)
-
-		// Enroll
-		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/user/%s/enroll", regularUserEmail), nil)
-		res := makeRequestToHandlerWithClaims(&claims, "/user/{email}/enroll", userHandler.Enroll, req)
-
-		assert.Equal(t, http.StatusOK, res.Result().StatusCode)
-	})
-
-	t.Run("Regular user cannot enroll other users", func(t *testing.T) {
-		t.Parallel()
-
-		userHandler, _ := createUserHandler(t)
-		claims := helpers.AuthClaims{
-			Email:       regularUserEmail,
-			Permissions: "",
-		}
-
-		// Enroll
-		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/user/%s/enroll", adminEmail), nil)
-		res := makeRequestToHandlerWithClaims(&claims, "/user/{email}/enroll", userHandler.Enroll, req)
-		location, _ := res.Result().Location()
-
-		// Redirect to user page
-		assert.Equal(t, http.StatusFound, res.Result().StatusCode)
-		assert.Contains(t, location.Path, regularUserEmail)
+		// Forbidden
+		assert.Equal(t, http.StatusForbidden, res.Result().StatusCode)
 	})
 }
 
@@ -289,7 +224,7 @@ func TestUserHandler_Renew(t *testing.T) {
 		}
 
 		// Make sure user doesn't exist
-		err := userRepo.DeleteUser(regularUserEmail)
+		err := userRepo.Delete(regularUserEmail)
 		assert.NoError(t, err)
 
 		// Renew
@@ -327,10 +262,8 @@ func TestUserHandler_Renew(t *testing.T) {
 		// Renew
 		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/user/%s/renew", adminEmail), nil)
 		res := makeRequestToHandlerWithClaims(&claims, "/user/{email}/renew", userHandler.Renew, req)
-		location, _ := res.Result().Location()
 
 		// Redirect to user page
-		assert.Equal(t, http.StatusFound, res.Result().StatusCode)
-		assert.Contains(t, location.Path, regularUserEmail)
+		assert.Equal(t, http.StatusForbidden, res.Result().StatusCode)
 	})
 }

@@ -16,15 +16,19 @@ const userCtxKey userCtxKeyType = "auth_claims"
 
 type AuthClaims struct {
 	Email       string `json:"email"`
+	Name        string `json:"name"`
+	Picture     string `json:"picture"`
 	Permissions string `json:"permissions"`
 	jwt.StandardClaims
 }
 
-func NewAuthClaims(email string, permissions string) *AuthClaims {
+func NewAuthClaims(email string, name string, picture string, permissions string) *AuthClaims {
 	expirationTime := time.Now().Add(AuthClaimsDurationInMinutes * time.Minute)
 	// Create the JWT claims, which includes the username and expiry time
 	return &AuthClaims{
 		Email:       email,
+		Name:        name,
+		Picture:     picture,
 		Permissions: permissions,
 		StandardClaims: jwt.StandardClaims{
 			// In JWT, the expiry time is expressed as unix milliseconds

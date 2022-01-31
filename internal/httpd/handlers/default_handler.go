@@ -40,7 +40,7 @@ func (u *DefaultHandler) Root(httpResponse http.ResponseWriter, httpRequest *htt
 
 	log.Printf("Home/Root [%v]: claims %v", httpRequest.RemoteAddr, claims.Email)
 
-	user, err := u.UserRepo.UserWithEmail(claims.Email)
+	user, err := u.UserRepo.FindByEmail(claims.Email)
 	if errors.Is(err, repos.ErrUserNotFound) {
 		createURL := fmt.Sprintf("/user/%s/enroll", claims.Email)
 		http.Redirect(httpResponse, httpRequest, createURL, http.StatusFound)

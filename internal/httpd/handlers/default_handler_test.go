@@ -53,7 +53,7 @@ func TestDefaultHandler_Root(t *testing.T) {
 		}
 
 		user := users[0]
-		claims := helpers.NewAuthClaims(user.Email, "")
+		claims := helpers.NewAuthClaims(user.Email, user.Name, user.Picture, "")
 		token := authHelper.NewJWTSignedString(claims)
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -82,7 +82,7 @@ func TestDefaultHandler_Root(t *testing.T) {
 		authHelper := helpers.NewAuthHelper("test.com", "secret", []string{})
 		authMiddleware := middlewares.NewAuthMiddleware("/auth", []string{"/"}, []string{}, authHelper)
 		defaultHandler := handlers.NewDefaultHandler(userRepo, pageHelper)
-		claims := helpers.NewAuthClaims("user_does_not_exist@not_a_user.com", "")
+		claims := helpers.NewAuthClaims("user_does_not_exist@not_a_user.com", "no name", "", "")
 		token := authHelper.NewJWTSignedString(claims)
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
