@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"crypto/tls"
-	"io/fs"
 	"log"
 	"net/http"
 	"os"
@@ -17,7 +16,6 @@ import (
 	"github.com/p-l/fringe/internal/radiusd"
 	"github.com/p-l/fringe/internal/repos"
 	"github.com/p-l/fringe/internal/system"
-	"github.com/p-l/fringe/templates"
 	"github.com/spf13/viper"
 	"golang.org/x/crypto/acme/autocert"
 	"layeh.com/radius"
@@ -48,14 +46,12 @@ func openUserRepo(connexion *sqlx.DB) *repos.UserRepository {
 }
 
 func newWebServers(config system.Config, userRepo *repos.UserRepository, jwtSecret string) (*http.Server, *http.Server) {
-	staticTemplates := fs.FS(templates.Files())
 	clientAssets := client.Files()
 
 	// HTTPS
 	httpsSrv := httpd.NewHTTPServer(
 		config,
 		userRepo,
-		staticTemplates,
 		clientAssets,
 		jwtSecret)
 

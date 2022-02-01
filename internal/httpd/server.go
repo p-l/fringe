@@ -31,18 +31,17 @@ const (
 )
 
 // NewHTTPServer Create and configure the HTTP server.
-func NewHTTPServer(config system.Config, repo *repos.UserRepository, templates fs.FS, clientAssets fs.FS, jwtSecret string) *http.Server {
+func NewHTTPServer(config system.Config, repo *repos.UserRepository, clientAssets fs.FS, jwtSecret string) *http.Server {
 	googleOAuth := services.NewGoogleOAuthService(http.DefaultClient, config.OAuth.Google.ClientID, config.OAuth.Google.ClientSecret, fmt.Sprintf("https://%s/auth/google/callback", config.Web.Domain))
 
 	authHelper := helpers.NewAuthHelper(config.Security.AllowedDomain, jwtSecret, config.Security.AuthorizedAdminEmails)
-	pageHelper := helpers.NewPageHelper(templates)
 
 	logMiddleware := middlewares.NewLogMiddleware()
 	authMiddleware := middlewares.NewAuthMiddleware("/auth/", []string{"/api"}, []string{"/api/auth/", "/api/config/"}, authHelper)
 
-	homeHandler := handlers.NewDefaultHandler(repo, pageHelper)
+	defaultHandler := handlers.NewDefaultHandler()
 	authHandler := handlers.NewAuthHandler(repo, googleOAuth, authHelper)
-	userHandler := handlers.NewUserHandler(repo, authHelper, pageHelper)
+	userHandler := handlers.NewUserHandler(repo, authHelper)
 	configHandler := handlers.NewConfigHandler(config.OAuth.Google)
 
 	router := mux.NewRouter()
@@ -50,7 +49,6 @@ func NewHTTPServer(config system.Config, repo *repos.UserRepository, templates f
 	router.Use(authMiddleware.EnsureAuth)
 
 	// Hook the handlers
-	router.HandleFunc("/api/", homeHandler.Root).Methods(http.MethodGet)
 	router.HandleFunc("/api/auth/", authHandler.Login).Methods(http.MethodPost)
 	router.HandleFunc("/api/config/", configHandler.Root).Methods(http.MethodGet)
 	router.HandleFunc("/api/users/", userHandler.List).Methods("GET")
@@ -62,7 +60,7 @@ func NewHTTPServer(config system.Config, repo *repos.UserRepository, templates f
 	if len(config.Web.ReverseProxy) == 0 {
 		// Built-in client
 		router.PathPrefix("/").Handler(http.StripPrefix("/", http.FileServer(http.FS(clientAssets))))
-		router.NotFoundHandler = http.HandlerFunc(homeHandler.NotFound)
+		router.NotFoundHandler = http.HandlerFunc(defaultHandler.NotFound)
 	} else {
 		log.Printf("Using reverse proxy from %s instead of serving files", config.Web.ReverseProxy)
 		proxyURL, err := url.Parse(config.Web.ReverseProxy)

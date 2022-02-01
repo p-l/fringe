@@ -13,7 +13,6 @@ import (
 	"github.com/p-l/fringe/internal/httpd/middlewares"
 	"github.com/p-l/fringe/internal/mocks"
 	"github.com/p-l/fringe/internal/repos"
-	"github.com/p-l/fringe/templates"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -36,9 +35,8 @@ func createUserHandler(t *testing.T) (*handlers.UserHandler, *repos.UserReposito
 	}
 
 	authHelper := helpers.NewAuthHelper("test.com", "secret", []string{})
-	pageHelper := helpers.NewPageHelper(templates.Files())
 
-	userHandler := handlers.NewUserHandler(userRepo, authHelper, pageHelper)
+	userHandler := handlers.NewUserHandler(userRepo, authHelper)
 
 	return userHandler, userRepo
 }
@@ -263,7 +261,6 @@ func TestUserHandler_Renew(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/user/%s/renew", adminEmail), nil)
 		res := makeRequestToHandlerWithClaims(&claims, "/user/{email}/renew", userHandler.Renew, req)
 
-		// Redirect to user page
 		assert.Equal(t, http.StatusForbidden, res.Result().StatusCode)
 	})
 }

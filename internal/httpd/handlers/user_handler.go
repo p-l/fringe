@@ -18,7 +18,6 @@ import (
 type UserHandler struct {
 	userRepo   *repos.UserRepository
 	authHelper *helpers.AuthHelper
-	pageHelper *helpers.PageHelper
 }
 
 type UserResponse struct {
@@ -36,11 +35,10 @@ const (
 	newUserPasswordNumOfSymbols = 2
 )
 
-func NewUserHandler(userRepo *repos.UserRepository, authHelper *helpers.AuthHelper, pageHelper *helpers.PageHelper) *UserHandler {
+func NewUserHandler(userRepo *repos.UserRepository, authHelper *helpers.AuthHelper) *UserHandler {
 	return &UserHandler{
 		userRepo:   userRepo,
 		authHelper: authHelper,
-		pageHelper: pageHelper,
 	}
 }
 
