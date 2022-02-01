@@ -36,7 +36,7 @@ func NewHTTPServer(config system.Config, repo *repos.UserRepository, clientAsset
 
 	authHelper := helpers.NewAuthHelper(config.Security.AllowedDomain, jwtSecret, config.Security.AuthorizedAdminEmails)
 
-	logMiddleware := middlewares.NewLogMiddleware()
+	logMiddleware := middlewares.NewLogMiddleware(log.Default())
 	authMiddleware := middlewares.NewAuthMiddleware("/auth/", []string{"/api"}, []string{"/api/auth/", "/api/config/"}, authHelper)
 
 	defaultHandler := handlers.NewDefaultHandler()
