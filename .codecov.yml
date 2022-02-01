@@ -1,5 +1,10 @@
 ignore:
-  - "internal/mocks"
-  - "client/src/ui"
   - "**/index.ts"
   - "**/index.tsx"
+  - "client/src/ui"
+  - "client/client.go"
+  - "internal/httpd/server.go"
+  - "internal/httpd/redirect.go"
+  - "internal/mocks/*.go"
+  - "internal/radius/server.go"
+  - "main.go"
