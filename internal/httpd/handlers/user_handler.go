@@ -61,8 +61,8 @@ func (u *UserHandler) List(httpResponse http.ResponseWriter, httpRequest *http.R
 
 	pageNumber := 0
 	pageSize := 10
-	pageQueried := httpRequest.URL.Query().Get("page")
-	perPage := httpRequest.URL.Query().Get("per_page")
+	pageQueried := sanitize.AlphaNumeric(httpRequest.URL.Query().Get("page"), false)
+	perPage := sanitize.AlphaNumeric(httpRequest.URL.Query().Get("per_page"), false)
 
 	if len(pageQueried) > 0 {
 		pageNumber, err = strconv.Atoi(pageQueried)
@@ -75,7 +75,7 @@ func (u *UserHandler) List(httpResponse http.ResponseWriter, httpRequest *http.R
 	if len(perPage) > 0 {
 		pageSize, err = strconv.Atoi(perPage)
 		if err != nil {
-			pageSize := 10
+			pageSize = 10
 			log.Printf("User/List [%v]: Could not parse per_page '%s', defaulting to %d", httpRequest.RemoteAddr, perPage, pageSize)
 		}
 	}
