@@ -161,7 +161,7 @@ describe('AuthService', () => {
   it('it adds authorization headers on calls to the API', async () => {
     localStorage.setItem('token_type', 'test_type');
     localStorage.setItem('token', 'test_token');
-    const futureExpiry = Date.now() + 300*1000;
+    const futureExpiry = Date.now() + 300 * 1000;
     localStorage.setItem('token_expires_at', futureExpiry.toString());
 
     const auth = useAuthService();
@@ -171,9 +171,8 @@ describe('AuthService', () => {
       'duration': 300,
     });
 
-    const targetURL = auth.apiRootURL+'test/';
-    mock.onGet(targetURL).reply( (config) => {
-      console.log(config);
+    const targetURL = auth.apiRootURL + 'test/';
+    mock.onGet(targetURL).reply((config) => {
       return [200, {requestHeaders: config.headers}];
     });
 
@@ -181,7 +180,7 @@ describe('AuthService', () => {
       expect(success).toBeTruthy();
       expect(userAuth).not.toBeNull();
 
-      axios.get(targetURL).then((response)=>{
+      axios.get(targetURL).then((response) => {
         expect(response).not.toBeNull();
         expect(response.data).not.toBeNull();
         expect(response.data.requestHeaders).not.toBeNull();
@@ -190,6 +189,22 @@ describe('AuthService', () => {
       }).catch((error) => {
         console.error(error);
       });
+    });
+  });
+
+  it('it adds authorization headers on calls to other sites', async () => {
+    const targetURL = 'https://this.is.a.test.com/test/';
+    mock.onGet(targetURL).reply((config) => {
+      return [200, {requestHeaders: config.headers}];
+    });
+
+    axios.get(targetURL).then((response) => {
+      expect(response).not.toBeNull();
+      expect(response.data).not.toBeNull();
+      expect(response.data.requestHeaders).not.toBeNull();
+      expect(response.data.requestHeaders['Authorization']).toBeNull();
+    }).catch((error) => {
+      console.error(error);
     });
   });
 });

@@ -39,11 +39,13 @@ class UserService {
       const user = UserService.createUserFromResponseData(response.data);
       if (user == null) {
         console.warn(`Invalid user response from user API at ${this.userApiURL()+'me/renew/'}`);
+        callback(null);
       } else if (user.password == null || user.password.length < 1) {
         console.warn(`No password provided in password renew API at ${this.userApiURL()+'me/renew/'}`);
+        callback(null);
+      } else {
+        callback(user);
       }
-
-      callback(user);
     }).catch((error) => {
       console.warn(`Unable to renew password from ${this.userApiURL()+'me/renew/'}: ${error}`);
       callback(null);
