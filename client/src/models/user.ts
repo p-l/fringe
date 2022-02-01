@@ -7,7 +7,7 @@ export class User {
   password: string|null;
 
 
-  public constructor(email: string, name: string, picture: string, unixLastSeenAt: number, unixPasswordUpdatedAt: number, password: string|null) {
+  public constructor(email: string, name: string, picture: string, unixLastSeenAt: number, unixPasswordUpdatedAt: number, password: string|null = null) {
     this.email = email;
     this.name = name;
     this.picture = picture;

@@ -69,13 +69,16 @@ describe('UserService', () => {
   it('returns user when minimal fields are present', async () => {
     const userService = new UserService();
     mock.onGet(userService.userApiURL()+'me/').reply(200, {
-      'email': 'email@email.com',
+      'email': 'some@email.com',
+      'name': 'some user',
+      'picture': 'https://picture.url',
+      'password_updated_at': 0,
       'last_seen_at': 0,
     }, null); // missing email field
 
     userService.me((user) => {
       expect(user).not.toBeNull();
-      expect(user?.email).toBe('email@email.com');
+      expect(user?.email).toBe('some@email.com');
       expect(user?.lastSeenAt).toEqual(new Date(0));
     });
   });
@@ -83,7 +86,10 @@ describe('UserService', () => {
   it('returns user password when received on initial get', async () => {
     const userService = new UserService();
     mock.onGet(userService.userApiURL()+'me/').reply(200, {
-      'email': 'email@email.com',
+      'email': 'some@email.com',
+      'name': 'some user',
+      'picture': 'https://picture.url',
+      'password_updated_at': 0,
       'last_seen_at': 0,
       'password': 'super_secret',
     }, null); // missing email field
@@ -106,8 +112,10 @@ describe('UserService', () => {
   it('returns null when receiving invalid on renew', async () => {
     const userService = new UserService();
     mock.onGet(userService.userApiURL()+'me/renew/').reply(200, {
+      'name': 'some user',
+      'picture': 'https://picture.url',
+      'password_updated_at': 0,
       'last_seen_at': 0,
-      'password': '',
     }, null); // missing email field
 
     userService.renewMyPassword((user) => {
@@ -118,7 +126,10 @@ describe('UserService', () => {
   it('returns null when empty password is received on renew', async () => {
     const userService = new UserService();
     mock.onGet(userService.userApiURL()+'me/renew/').reply(200, {
-      'email': 'email@email.com',
+      'email': 'some@email.com',
+      'name': 'some user',
+      'picture': 'https://picture.url',
+      'password_updated_at': 0,
       'last_seen_at': 0,
       'password': '',
     }, null); // missing email field
@@ -131,7 +142,10 @@ describe('UserService', () => {
   it('returns null when no password is received on renew', async () => {
     const userService = new UserService();
     mock.onGet(userService.userApiURL()+'me/renew/').reply(200, {
-      'email': 'email@email.com',
+      'email': 'some@email.com',
+      'name': 'some user',
+      'picture': 'https://picture.url',
+      'password_updated_at': 0,
       'last_seen_at': 0,
     }, null); // missing email field
 
@@ -143,7 +157,10 @@ describe('UserService', () => {
   it('returns user when a password is received on renew', async () => {
     const userService = new UserService();
     mock.onGet(userService.userApiURL()+'me/renew/').reply(200, {
-      'email': 'email@email.com',
+      'email': 'some@email.com',
+      'name': 'some user',
+      'picture': 'https://picture.url',
+      'password_updated_at': 0,
       'last_seen_at': 0,
       'password': 'super_random_password',
     }, null); // missing email field

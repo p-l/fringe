@@ -13,11 +13,14 @@ class UserService {
   }
 
   private static createUserFromResponseData(data : any) : User|null {
-    if ('email' in data && 'last_seen_at' in data) {
-      return new User(data['email'], data['name'], data['picture'], data['last_seen_at'], data['password_updated_at'], data['password']);
+    const requiredFields = ['email', 'name', 'picture', 'last_seen_at', 'password_updated_at'];
+    for (const field of requiredFields) {
+      if (!(field in data)) {
+        return null;
+      }
     }
 
-    return null;
+    return new User(data['email'], data['name'], data['picture'], data['last_seen_at'], data['password_updated_at'], data['password']);
   }
 
   me(callback: (user: User|null) => void) : void {
