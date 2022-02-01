@@ -1,2 +1,5 @@
 ignore:
   - "internal/mocks"
+  - "client/src/ui"
+  - "**/index.ts"
+  - "**/index.tsx"
