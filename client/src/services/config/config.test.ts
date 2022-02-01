@@ -52,11 +52,11 @@ describe('Config', () => {
 
   it('does not double slash config URL', async () => {
     const config = new Config();
-    expect(config.apiRootURL).toBe('/api/');
-    expect(config.configApiURL()).toBe('/api/config/');
+    expect(config.apiRootURL).toContain('/api/');
+    expect(config.configApiURL()).toContain('/api/config/');
 
     config.apiRootURL = '/test/api';
-    expect(config.apiRootURL).toBe('/test/api');
-    expect(config.configApiURL()).toBe('/test/api/config/');
+    expect(config.apiRootURL).toContain('/test/api');
+    expect(config.configApiURL()).toContain('/test/api/config/');
   });
 });

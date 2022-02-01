@@ -86,12 +86,12 @@ describe('AuthService', () => {
 
   it('does not double slash auth URL', async () => {
     const auth = new AuthService();
-    expect(auth.apiRootURL).toBe('/api/');
-    expect(auth.loginApiURL()).toBe('/api/auth/');
+    expect(auth.apiRootURL).toContain('/api/');
+    expect(auth.loginApiURL()).toContain('/api/auth/');
 
     auth.apiRootURL = '/test/api';
-    expect(auth.apiRootURL).toBe('/test/api');
-    expect(auth.loginApiURL()).toBe('/test/api/auth/');
+    expect(auth.apiRootURL).toContain('/test/api');
+    expect(auth.loginApiURL()).toContain('/test/api/auth/');
   });
 
   it('stores and restores UserAuth', async () => {
