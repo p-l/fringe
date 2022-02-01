@@ -32,7 +32,7 @@ func dbOpen() (*sqlx.DB, sqlmock.Sqlmock) {
 	return db, mockSQL
 }
 
-func TestUserRepository_CreateUser(t *testing.T) {
+func TestUserRepository_Create(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Returns new user when creating", func(t *testing.T) {
@@ -79,7 +79,7 @@ func TestUserRepository_CreateUser(t *testing.T) {
 		}
 	})
 
-	t.Run("Don't change record when trying to create existing user", func(t *testing.T) {
+	t.Run("Dont modify existing user", func(t *testing.T) {
 		t.Parallel()
 
 		db, mockSQL := dbOpen()
@@ -107,18 +107,8 @@ func TestUserRepository_CreateUser(t *testing.T) {
 		user, err := userRepo.Create(email, name, picture, newPassword)
 		assert.ErrorIs(t, err, repos.ErrUserAlreadyExist)
 
-		// CreatUser will return the existing user without modifying it
-		assert.NotNil(t, user)
-
-		if user != nil {
-			assert.Equal(t, email, user.Email)
-			// The retrieved user is expected to contain the fake password Hash and match
-			assert.True(t, user.PasswordMatch(password))
-			assert.Equal(t, createdAt, user.CreatedAt)
-			assert.Equal(t, profileUpdatedAt, user.ProfileUpdatedAt)
-			assert.Equal(t, passwordUpdatedAt, user.PasswordUpdatedAt)
-			assert.Equal(t, lastSeenAt, user.LastSeenAt)
-		}
+		// CreatUser will return
+		assert.Nil(t, user)
 
 		// we make sure that all expectations were met
 		if err := mockSQL.ExpectationsWereMet(); err != nil {
@@ -127,10 +117,10 @@ func TestUserRepository_CreateUser(t *testing.T) {
 	})
 }
 
-func TestUserRepository_UserWithEmail(t *testing.T) {
+func TestUserRepository_FindByEmail(t *testing.T) {
 	t.Parallel()
 
-	t.Run("Returns unmodified user when found", func(t *testing.T) {
+	t.Run("Returns user when found", func(t *testing.T) {
 		t.Parallel()
 
 		db, mockSQL := dbOpen()
@@ -199,7 +189,7 @@ func TestUserRepository_UserWithEmail(t *testing.T) {
 	})
 }
 
-func TestUserRepository_UpdateUserPassword(t *testing.T) {
+func TestUserRepository_UpdatePassword(t *testing.T) {
 	t.Parallel()
 	t.Run("Fails with unknown user", func(t *testing.T) {
 		t.Parallel()
@@ -265,7 +255,7 @@ func TestUserRepository_UpdateUserPassword(t *testing.T) {
 	})
 }
 
-func TestUserRepository_TouchUser(t *testing.T) {
+func TestUserRepository_Seen(t *testing.T) {
 	t.Parallel()
 	t.Run("Fails with unknown user", func(t *testing.T) {
 		t.Parallel()
@@ -276,10 +266,7 @@ func TestUserRepository_TouchUser(t *testing.T) {
 		fake := faker.New()
 		email := fake.Internet().Email()
 
-		mockSQL.ExpectBegin()
-		mockSQL.ExpectPrepare("UPDATE users").WillBeClosed()
-		mockSQL.ExpectExec("").WillReturnResult(sqlmock.NewResult(0, 0))
-		mockSQL.ExpectCommit()
+		mockSQL.ExpectQuery("SELECT").WillReturnRows(sqlmock.NewRows(userTableColumns()))
 
 		userRepo, _ := repos.NewUserRepository(db)
 
@@ -301,6 +288,16 @@ func TestUserRepository_TouchUser(t *testing.T) {
 
 		fake := faker.New()
 		email := fake.Internet().Email()
+		name := fake.Person().Name()
+		picture := fake.Internet().URL()
+		passwordHash, _ := repos.CreatePasswordHash(fake.Internet().Password())
+		createdAt := fake.Time().Unix(time.Now())
+		profileUpdatedAt := fake.Time().Unix(time.Now())
+		passwordUpdatedAt := fake.Time().Unix(time.Now())
+		lastSeenAt := fake.Time().Unix(time.Now())
+
+		mockSQL.ExpectQuery("SELECT").WillReturnRows(
+			sqlmock.NewRows(userTableColumns()).AddRow(email, name, picture, passwordHash, createdAt, profileUpdatedAt, passwordUpdatedAt, lastSeenAt))
 
 		mockSQL.ExpectBegin()
 		// Ensures target "last_seen_at" column
@@ -320,7 +317,7 @@ func TestUserRepository_TouchUser(t *testing.T) {
 	})
 }
 
-func TestUserRepository_AuthenticateUser(t *testing.T) {
+func TestUserRepository_Authenticate(t *testing.T) {
 	t.Parallel()
 	t.Run("Returns UserNotFound when not found", func(t *testing.T) {
 		t.Parallel()
@@ -365,6 +362,8 @@ func TestUserRepository_AuthenticateUser(t *testing.T) {
 		lastSeenAt := fake.Time().Unix(time.Now())
 
 		// Return the fake User
+		mockSQL.ExpectQuery("SELECT").WillReturnRows(
+			sqlmock.NewRows(userTableColumns()).AddRow(email, name, picture, passwordHash, createdAt, profileUpdatedAt, passwordUpdatedAt, lastSeenAt))
 		mockSQL.ExpectQuery("SELECT").WillReturnRows(
 			sqlmock.NewRows(userTableColumns()).AddRow(email, name, picture, passwordHash, createdAt, profileUpdatedAt, passwordUpdatedAt, lastSeenAt))
 		mockSQL.ExpectBegin()
@@ -517,5 +516,292 @@ func TestUserRepository_AllUsers(t *testing.T) {
 		if err := mockSQL.ExpectationsWereMet(); err != nil {
 			t.Errorf("there were unfulfilled expectations: %s", err)
 		}
+	})
+}
+
+func TestUserRepository_Delete(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Delete user when found", func(t *testing.T) {
+		t.Parallel()
+
+		db, mockSQL := dbOpen()
+		defer db.Close()
+
+		fake := faker.New()
+		email := fake.Internet().Email()
+		name := fake.Person().Name()
+		picture := fake.Internet().URL()
+		passwordHash, _ := repos.CreatePasswordHash(fake.Internet().Password())
+		createdAt := fake.Time().Unix(time.Now())
+		profileUpdatedAt := fake.Time().Unix(time.Now())
+		passwordUpdatedAt := fake.Time().Unix(time.Now())
+		lastSeenAt := fake.Time().Unix(time.Now())
+
+		mockSQL.ExpectQuery("SELECT").WillReturnRows(
+			sqlmock.NewRows(userTableColumns()).AddRow(email, name, picture, passwordHash, createdAt, profileUpdatedAt, passwordUpdatedAt, lastSeenAt))
+
+		mockSQL.ExpectBegin()
+		// Ensures target "last_seen_at" column
+		mockSQL.ExpectPrepare("DELETE FROM users WHERE email == .*").WillBeClosed()
+		mockSQL.ExpectExec("").WithArgs(email).WillReturnResult(sqlmock.NewResult(0, 1))
+		mockSQL.ExpectCommit()
+
+		userRepo, _ := repos.NewUserRepository(db)
+
+		err := userRepo.Delete(email)
+		assert.Nil(t, err)
+
+		// we make sure that all expectations were met
+		if err := mockSQL.ExpectationsWereMet(); err != nil {
+			t.Errorf("there were unfulfilled expectations: %s", err)
+		}
+	})
+
+	t.Run("Return user not found when not in DB", func(t *testing.T) {
+		t.Parallel()
+
+		db, mockSQL := dbOpen()
+		defer db.Close()
+
+		fake := faker.New()
+		email := fake.Internet().Email()
+
+		mockSQL.ExpectQuery("SELECT").WillReturnRows(sqlmock.NewRows(userTableColumns()))
+
+		userRepo, _ := repos.NewUserRepository(db)
+
+		err := userRepo.Delete(email)
+		assert.ErrorIs(t, err, repos.ErrUserNotFound)
+
+		// we make sure that all expectations were met
+		if err := mockSQL.ExpectationsWereMet(); err != nil {
+			t.Errorf("there were unfulfilled expectations: %s", err)
+		}
+	})
+
+	t.Run("Return error if no rows are affected", func(t *testing.T) {
+		t.Parallel()
+
+		db, mockSQL := dbOpen()
+		defer db.Close()
+
+		fake := faker.New()
+		email := fake.Internet().Email()
+		name := fake.Person().Name()
+		picture := fake.Internet().URL()
+		passwordHash, _ := repos.CreatePasswordHash(fake.Internet().Password())
+		createdAt := fake.Time().Unix(time.Now())
+		profileUpdatedAt := fake.Time().Unix(time.Now())
+		passwordUpdatedAt := fake.Time().Unix(time.Now())
+		lastSeenAt := fake.Time().Unix(time.Now())
+
+		mockSQL.ExpectQuery("SELECT").WillReturnRows(
+			sqlmock.NewRows(userTableColumns()).AddRow(email, name, picture, passwordHash, createdAt, profileUpdatedAt, passwordUpdatedAt, lastSeenAt))
+
+		mockSQL.ExpectBegin()
+		// Ensures target "last_seen_at" column
+		mockSQL.ExpectPrepare("DELETE FROM users WHERE email == .*").WillBeClosed()
+		mockSQL.ExpectExec("").WithArgs(email).WillReturnResult(sqlmock.NewResult(0, 0))
+		mockSQL.ExpectCommit()
+
+		userRepo, _ := repos.NewUserRepository(db)
+
+		err := userRepo.Delete(email)
+		assert.Error(t, err)
+
+		// we make sure that all expectations were met
+		if err := mockSQL.ExpectationsWereMet(); err != nil {
+			t.Errorf("there were unfulfilled expectations: %s", err)
+		}
+	})
+}
+
+func TestUserRepository_UpdateProfile(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Fails with unknown user", func(t *testing.T) {
+		t.Parallel()
+
+		db, mockSQL := dbOpen()
+		defer db.Close()
+
+		fake := faker.New()
+		email := fake.Internet().Email()
+		newPicture := fake.Internet().URL()
+		newName := fake.Person().Name()
+
+		mockSQL.ExpectQuery("SELECT").WillReturnRows(
+			sqlmock.NewRows(userTableColumns()))
+
+		userRepo, _ := repos.NewUserRepository(db)
+
+		success, err := userRepo.UpdateProfile(email, newName, newPicture)
+		assert.NotNil(t, err)
+		assert.False(t, success)
+
+		// we make sure that all expectations were met
+		if err := mockSQL.ExpectationsWereMet(); err != nil {
+			t.Errorf("there were unfulfilled expectations: %s", err)
+		}
+	})
+
+	t.Run("Updates known user", func(t *testing.T) {
+		t.Parallel()
+
+		db, mockSQL := dbOpen()
+		defer db.Close()
+
+		fake := faker.New()
+		email := fake.Internet().Email()
+		name := fake.Person().Name()
+		picture := fake.Internet().URL()
+		passwordHash, _ := repos.CreatePasswordHash(fake.Internet().Password())
+		createdAt := fake.Time().Unix(time.Now())
+		profileUpdatedAt := fake.Time().Unix(time.Now())
+		passwordUpdatedAt := fake.Time().Unix(time.Now())
+		lastSeenAt := fake.Time().Unix(time.Now())
+		newName := fake.Person().Name()
+		newPicture := fake.Internet().URL()
+
+		mockSQL.ExpectQuery("SELECT").WillReturnRows(
+			sqlmock.NewRows(userTableColumns()).AddRow(email, name, picture, passwordHash, createdAt, profileUpdatedAt, passwordUpdatedAt, lastSeenAt))
+		mockSQL.ExpectBegin()
+		// Ensure that password, updated_at AND last_seen_at are updated
+		mockSQL.ExpectPrepare("UPDATE users SET name = .*, picture = .*, profile_updated_at = .* WHERE email == .*").WillBeClosed()
+		mockSQL.ExpectExec("").WithArgs(newName, newPicture, sqlmock.AnyArg(), email).WillReturnResult(sqlmock.NewResult(0, 1))
+		mockSQL.ExpectCommit()
+
+		userRepo, _ := repos.NewUserRepository(db)
+
+		success, err := userRepo.UpdateProfile(email, newName, newPicture)
+		assert.Nil(t, err)
+		assert.True(t, success)
+
+		// we make sure that all expectations were met
+		if err := mockSQL.ExpectationsWereMet(); err != nil {
+			t.Errorf("there were unfulfilled expectations: %s", err)
+		}
+	})
+
+	t.Run("Fail on no affected row", func(t *testing.T) {
+		t.Parallel()
+
+		db, mockSQL := dbOpen()
+		defer db.Close()
+
+		fake := faker.New()
+		email := fake.Internet().Email()
+		name := fake.Person().Name()
+		picture := fake.Internet().URL()
+		passwordHash, _ := repos.CreatePasswordHash(fake.Internet().Password())
+		createdAt := fake.Time().Unix(time.Now())
+		profileUpdatedAt := fake.Time().Unix(time.Now())
+		passwordUpdatedAt := fake.Time().Unix(time.Now())
+		lastSeenAt := fake.Time().Unix(time.Now())
+		newName := fake.Person().Name()
+		newPicture := fake.Internet().URL()
+
+		mockSQL.ExpectQuery("SELECT").WillReturnRows(
+			sqlmock.NewRows(userTableColumns()).AddRow(email, name, picture, passwordHash, createdAt, profileUpdatedAt, passwordUpdatedAt, lastSeenAt))
+		mockSQL.ExpectBegin()
+		// Ensure that password, updated_at AND last_seen_at are updated
+		mockSQL.ExpectPrepare("UPDATE users SET name = .*, picture = .*, profile_updated_at = .* WHERE email == .*").WillBeClosed()
+		mockSQL.ExpectExec("").WithArgs(newName, newPicture, sqlmock.AnyArg(), email).WillReturnResult(sqlmock.NewResult(0, 0))
+		mockSQL.ExpectCommit()
+
+		userRepo, _ := repos.NewUserRepository(db)
+
+		success, err := userRepo.UpdateProfile(email, newName, newPicture)
+		assert.NoError(t, err)
+		assert.False(t, success)
+
+		// we make sure that all expectations were met
+		if err := mockSQL.ExpectationsWereMet(); err != nil {
+			t.Errorf("there were unfulfilled expectations: %s", err)
+		}
+	})
+}
+
+func TestUserRepository_Exists(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Returns true when user when found", func(t *testing.T) {
+		t.Parallel()
+
+		db, mockSQL := dbOpen()
+		defer db.Close()
+
+		fake := faker.New()
+		email := fake.Internet().Email()
+		name := fake.Person().Name()
+		picture := fake.Internet().URL()
+		password := fake.Internet().Password()
+		passwordHash, _ := repos.CreatePasswordHash(password)
+		createdAt := fake.Time().Unix(time.Now())
+		profileUpdatedAt := fake.Time().Unix(time.Now())
+		passwordUpdatedAt := fake.Time().Unix(time.Now())
+		lastSeenAt := fake.Time().Unix(time.Now())
+
+		// Return the fake User
+		mockSQL.ExpectQuery("SELECT").WillReturnRows(
+			sqlmock.NewRows(userTableColumns()).AddRow(email, name, picture, passwordHash, createdAt, profileUpdatedAt, passwordUpdatedAt, lastSeenAt))
+
+		userRepo, _ := repos.NewUserRepository(db)
+
+		assert.True(t, userRepo.Exists(email))
+
+		// we make sure that all expectations were met
+		if err := mockSQL.ExpectationsWereMet(); err != nil {
+			t.Errorf("there were unfulfilled expectations: %s", err)
+		}
+	})
+
+	t.Run("Returns error when user is not found", func(t *testing.T) {
+		t.Parallel()
+
+		db, mockSQL := dbOpen()
+		defer db.Close()
+
+		fake := faker.New()
+		email := fake.Internet().Email()
+
+		mockSQL.ExpectQuery("SELECT").WillReturnRows(
+			sqlmock.NewRows(userTableColumns()))
+
+		userRepo, _ := repos.NewUserRepository(db)
+
+		assert.False(t, userRepo.Exists(email))
+
+		// we make sure that all expectations were met
+		if err := mockSQL.ExpectationsWereMet(); err != nil {
+			t.Errorf("there were unfulfilled expectations: %s", err)
+		}
+	})
+}
+
+func TestNewUserRepository(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Panics on table creation failure", func(t *testing.T) {
+		t.Parallel()
+
+		mockDB, mockSQL, err := sqlmock.New()
+		if err != nil {
+			log.Panicf("FATAL: an error '%s' was not expected when opening a stub database connection", err)
+		}
+
+		db := sqlx.NewDb(mockDB, "sqlmock")
+		defer db.Close()
+
+		mockSQL.ExpectBegin()
+		mockSQL.ExpectExec("CREATE TABLE").WillReturnResult(sqlmock.NewResult(0, 0))
+		mockSQL.ExpectExec("CREATE INDEX").WillReturnError(sqlmock.ErrCancelled)
+		mockSQL.ExpectCommit()
+
+		assert.Panics(t, func() {
+			_, _ = repos.NewUserRepository(db)
+		})
+
 	})
 }

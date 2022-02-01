@@ -101,14 +101,8 @@ func (r *UserRepository) FindByEmail(email string) (*User, error) {
 // Create INSERT a new user record with email and argon2id password hash from the provided password.
 // If the user already exists returns the record from the Database, otherwise return the newly created User.
 func (r *UserRepository) Create(email string, name string, picture string, password string) (*User, error) {
-	dbUser, err := r.FindByEmail(email)
-	if !errors.Is(err, ErrUserNotFound) && err != nil {
-		return nil, err
-	}
-
-	// Return user if it already exists
-	if dbUser != nil {
-		return dbUser, ErrUserAlreadyExist
+	if r.Exists(email) {
+		return nil, ErrUserAlreadyExist
 	}
 
 	// Create User
@@ -157,13 +151,13 @@ func (r *UserRepository) Create(email string, name string, picture string, passw
 // UpdatePassword replaces the specified user's (found by email address) by the password provided.
 // The password is not stored as is. It is hashed with argon2id.
 func (r *UserRepository) UpdatePassword(email string, password string) (updated bool, err error) {
+	if !r.Exists(email) {
+		return false, ErrUserNotFound
+	}
+
 	hash, err := CreatePasswordHash(password)
 	if err != nil {
 		return false, err
-	}
-
-	if !r.Exists(email) {
-		return false, ErrUserNotFound
 	}
 
 	updateTx, err := r.db.Begin()
@@ -242,6 +236,10 @@ func (r *UserRepository) Exists(email string) bool {
 
 // Seen updates user's last_seen_at value with current Unix time.
 func (r *UserRepository) Seen(email string) error {
+	if !r.Exists(email) {
+		return ErrUserNotFound
+	}
+
 	now := time.Now()
 
 	updateTx, err := r.db.Begin()
@@ -330,6 +328,10 @@ func (r *UserRepository) AllUsers(limit int, page int) ([]User, error) {
 
 // Delete delete user record for given email.
 func (r *UserRepository) Delete(email string) error {
+	if !r.Exists(email) {
+		return ErrUserNotFound
+	}
+
 	delTx, err := r.db.Begin()
 	if err != nil {
 		return fmt.Errorf("could not delte %s: %w", email, err)
