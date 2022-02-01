@@ -802,6 +802,5 @@ func TestNewUserRepository(t *testing.T) {
 		assert.Panics(t, func() {
 			_, _ = repos.NewUserRepository(db)
 		})
-
 	})
 }
