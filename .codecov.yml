@@ -3,6 +3,8 @@ ignore:
   - "**/index.tsx"
   - "client/src/ui"
   - "client/client.go"
+  - "client/src/react-app-env.d.ts"
+  - "client/src/setupTests.ts"
   - "internal/httpd/server.go"
   - "internal/httpd/redirect.go"
   - "internal/mocks/*.go"
