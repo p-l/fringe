@@ -1,14 +1,16 @@
 import React, {Suspense} from 'react';
 import {Route, Routes} from 'react-router-dom';
 import {Box, CircularProgress, Container} from '@mui/material';
+import {useUserService} from '../../services/user/user-service';
 
 import ErrorBoundary from '../@components/error-boundary';
 import AuthProvider from '../@components/auth-provider';
 import NavBar from '../@components/nav-bar';
 import RequireAuth from '../@components/require-auth';
 import useMountEffect from '../@hooks/use-mount';
-import Home from '../home';
+import Me from '../me';
 import Login from '../login';
+import Admin from '../admin';
 import Config from '../../services/config';
 import {useAuthService} from '../../services/auth';
 
@@ -19,14 +21,15 @@ interface ApplicationProps {
 function Application(props: ApplicationProps) {
   useMountEffect(()=>{
     const authService = useAuthService();
+    const userService = useUserService();
     authService.apiRootURL = props.config.apiRootURL;
+    userService.apiRootURL = props.config.apiRootURL;
   });
-
 
   return (
     <ErrorBoundary>
       <Suspense fallback={
-        <Container component="main" maxWidth="xs">
+        <Container maxWidth="xs">
           <Box sx={{p: 50, m: 50, display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
             <CircularProgress />
           </Box>
@@ -35,7 +38,8 @@ function Application(props: ApplicationProps) {
         <AuthProvider>
           <NavBar config={props.config}/>
           <Routes>
-            <Route path="/" element={<RequireAuth><Home config={props.config} /></RequireAuth>} />
+            <Route path="/" element={<RequireAuth><Me /></RequireAuth>} />
+            <Route path="/admin" element={<RequireAuth><Admin /></RequireAuth>} />
             <Route path="/login" element={<Login googleClientID={props.config.googleClientID} />} />
           </Routes>
         </AuthProvider>

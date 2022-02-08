@@ -57,7 +57,7 @@ func (h *AuthHelper) InAllowedDomain(email string) bool {
 	return IsEmailInDomain(email, h.AllowedDomain)
 }
 
-func (h *AuthHelper) PermissionsForEmail(email string) string {
+func (h *AuthHelper) RoleForEmail(email string) string {
 	for _, adminEmail := range h.admins {
 		if strings.EqualFold(adminEmail, email) {
 			return "admin"

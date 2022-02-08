@@ -10,6 +10,7 @@ describe('AuthService', () => {
     localStorage.removeItem('token');
     localStorage.removeItem('token_type');
     localStorage.removeItem('token_expires_at');
+    localStorage.removeItem('token_role');
   });
 
   afterEach(() => {
@@ -147,6 +148,7 @@ describe('AuthService', () => {
     localStorage.setItem('token', 'test_token');
     const futureExpiry = Date.now() + 300*1000;
     localStorage.setItem('token_expires_at', futureExpiry.toString());
+    localStorage.setItem('token_role', 'user');
 
     const futureAuth = new AuthService();
     expect(futureAuth.currentUserAuth).not.toBeNull();

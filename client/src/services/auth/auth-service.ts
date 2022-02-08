@@ -3,7 +3,7 @@ import {UserAuth} from '../../models/user-auth';
 
 class AuthService {
   apiRootURL: string;
-  _userAuth: UserAuth|null;
+  private _userAuth: UserAuth|null;
 
   public constructor() {
     this.apiRootURL = 'https://'+window.location.host+'/api/';
@@ -12,9 +12,13 @@ class AuthService {
     const localToken = localStorage.getItem('token');
     const localTokenType = localStorage.getItem('token_type');
     const localTokenExpiresString = localStorage.getItem('token_expires_at');
+    let localTokenRole = localStorage.getItem('token_role');
+    if (localTokenRole == null) {
+      localTokenRole = 'unknown';
+    }
     if ( localToken && localTokenType && localTokenExpiresString) {
       const localTokenExpires = Number(localTokenExpiresString);
-      const auth = new UserAuth(localTokenType, localToken, localTokenExpires);
+      const auth = new UserAuth(localTokenType, localToken, localTokenExpires, localTokenRole);
       if (!auth.isExpired()) {
         this._userAuth = auth;
       }
@@ -31,6 +35,7 @@ class AuthService {
       localStorage.removeItem('token');
       localStorage.removeItem('token_type');
       localStorage.removeItem('token_expires_at');
+      localStorage.removeItem('token_role');
       this._userAuth = null;
 
       return;
@@ -39,6 +44,7 @@ class AuthService {
     localStorage.setItem('token_type', auth.tokenType);
     localStorage.setItem('token', auth.token);
     localStorage.setItem('token_expires_at', auth.expires.toString());
+    localStorage.setItem('token_role', auth.roleString);
     this._userAuth = auth;
   }
 
@@ -59,9 +65,8 @@ class AuthService {
       const durationInMilliseconds = Number(response.data['duration'])*1000;
       const expiry = Date.now()+durationInMilliseconds;
 
-      const auth = new UserAuth(response.data['token_type'], response.data['token'], expiry);
+      const auth = new UserAuth(response.data['token_type'], response.data['token'], expiry, response.data['role']);
       this.currentUserAuth = auth;
-      console.debug(`🛂 Authentication successful.`);
 
       callback(true, auth);
     }).catch((error) => {

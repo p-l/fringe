@@ -1,5 +1,5 @@
-import {LogoutRounded} from '@mui/icons-material';
-import {AppBar, Box, Button, Toolbar} from '@mui/material';
+import {GroupRounded, LogoutRounded} from '@mui/icons-material';
+import {AppBar, Box, Button, Stack, Toolbar} from '@mui/material';
 import React from 'react';
 import {GoogleLogout} from 'react-google-login';
 import {useNavigate} from 'react-router-dom';
@@ -18,28 +18,39 @@ function NavBar({config}: {config: Config}) {
     });
   };
 
-  const goHome = () => {
+  const goToRoot = () => {
     navigate('/', {replace: true});
+  };
+
+  const goToAdmin = () => {
+    navigate('/admin', {replace: true});
   };
 
   if (auth && auth.authenticated) {
     return (
-      <AppBar position="relative">
+      <AppBar position="sticky">
         <Toolbar disableGutters>
           <Box sx={{mr: 2}}>
-            <Button onClick={goHome}>
+            <Button onClick={goToRoot}>
               <img alt="fringe logo" src="/logo/fringe-user-white.svg" width={28}/>
             </Button>
           </Box>
           <Box sx={{flexGrow: 1}} />
-          <GoogleLogout
-            clientId={config.googleClientID}
-            onLogoutSuccess={googleLogoutSuccessHandler}
-            render={(props: {onClick: () => void, disabled?: boolean | undefined}) => (
-              <Button color="inherit" onClick={props.onClick} disabled={props.disabled}>
-                <LogoutRounded />
+          <Stack direction="row" justifyContent="flex-end" alignItems="center" spacing={0}>
+            {auth.adminRole && (
+              <Button color="inherit" onClick={goToAdmin}>
+                <GroupRounded />
               </Button>
-            )}/>
+            )}
+            <GoogleLogout
+              clientId={config.googleClientID}
+              onLogoutSuccess={googleLogoutSuccessHandler}
+              render={(props: {onClick: () => void, disabled?: boolean | undefined}) => (
+                <Button color="inherit" onClick={props.onClick} disabled={props.disabled}>
+                  <LogoutRounded />
+                </Button>
+              )}/>
+          </Stack>
         </Toolbar>
       </AppBar>
     );

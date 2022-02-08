@@ -8,7 +8,7 @@ import (
 	"github.com/golang-jwt/jwt"
 )
 
-const AuthClaimsDurationInMinutes = 5
+const AuthClaimsDurationInMinutes = 60
 
 type userCtxKeyType string
 

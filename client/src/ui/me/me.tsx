@@ -1,6 +1,7 @@
 import React from 'react';
-import {AccessTimeFilled, CheckCircleOutlineRounded, CopyAllRounded, LockRounded, PasswordRounded, WarningOutlined} from '@mui/icons-material';
-import {Alert, Avatar, Backdrop, Box, Button, CircularProgress, Container, Fade, FormControl, IconButton, Input, InputAdornment, InputLabel, List, ListItem, ListItemIcon, ListItemText, Modal, Paper, Snackbar, Stack, Typography} from '@mui/material';
+import {AccessTimeFilled, LockRounded, PasswordRounded} from '@mui/icons-material';
+import {Alert, Avatar, Box, Button, CircularProgress, Container, Dialog, DialogActions, DialogContent, DialogTitle, List, ListItem, ListItemIcon, ListItemText, Paper, Snackbar, Typography} from '@mui/material';
+import PasswordField from '../@components/password-field';
 
 import useMountEffect from '../@hooks/use-mount';
 import {User} from '../../models/user';
@@ -14,7 +15,6 @@ function Me() {
   const userService = useUserService();
   const [currentUser, setCurrentUser] = React.useState<User|null>(null);
   const [passwordState, setPasswordState] = React.useState<PasswordState>(PasswordState.NoPassword);
-  const [passwordCopied, setPasswordCopied] = React.useState<boolean>(false);
   const [errorMessage, setErrorMessage] = React.useState<string>('');
   const [warningModalOpen, setWarningModalOpen] = React.useState(false);
 
@@ -31,13 +31,7 @@ function Me() {
       }
     });
   };
-  const copyUserPassword = () => {
-    if (currentUser != null && currentUser.password != null) {
-      navigator.clipboard.writeText(currentUser.password).then(() => {
-        setPasswordCopied(true);
-      });
-    }
-  };
+
   const confirmWarningModal = () => {
     setWarningModalOpen(false);
     setPasswordState(PasswordState.FetchingPassword);
@@ -59,17 +53,22 @@ function Me() {
       <Snackbar autoHideDuration={4000} open={errorMessage.length > 0} onClose={()=> setErrorMessage('')}>
         <Alert severity="error" sx={{width: '100%'}}>{errorMessage}</Alert>
       </Snackbar>
-      { /* Password Copy Confirmation */ }
-      <Snackbar
-        autoHideDuration={3000}
-        open={passwordCopied}
-        onClose={() => setPasswordCopied(false)}
-        message="Password was copied to clipboard"
-      />
+      {/* Confirmation Dialog */}
+      <Dialog open={warningModalOpen}>
+        <DialogTitle>Replacing Password</DialogTitle>
+        <DialogContent>
+          Creating a new password will remove the previous password. Only one password can exist at a time.
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={cancelWarningModal}>Cancel</Button>
+          <Button onClick={confirmWarningModal} color="error">Understood</Button>
+        </DialogActions>
+      </Dialog>
+
       <Box sx={{marginTop: 5, display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
         <Avatar
           sx={{bgcolor: theme.palette.primary.main, width: 96, height: 96}}
-          alt={ currentUser?.name }
+          alt={ currentUser?.email }
           src={ currentUser?.picture }
         />
         <Typography component="h1" variant="h5" sx={{p: 1}}>
@@ -84,7 +83,7 @@ function Me() {
             </ListItemIcon>
             <ListItemText
               primary="Last Seen"
-              secondary={currentUser == null ? `...` : `${currentUser?.lastSeenAt.toDateString()} at ${currentUser?.lastSeenAt.toTimeString().split(' ')[0]}`}
+              secondary={currentUser == null ? `...` : currentUser.lastSeen()}
             />
           </ListItem>
           <ListItem >
@@ -93,7 +92,7 @@ function Me() {
             </ListItemIcon>
             <ListItemText
               primary="Password Age"
-              secondary={currentUser == null ? `...` : `${Math.ceil(Math.abs(Date.now() - currentUser?.passwordUpdatedAt.getTime())/(24*60*60*1000))} day old`}
+              secondary={currentUser == null ? `...` : `${currentUser.passwordAgeInDays()} day old`}
             />
           </ListItem>
         </List>
@@ -108,72 +107,11 @@ function Me() {
             </Button>
           )}
           { passwordState == PasswordState.HavePassword && (
-            <FormControl variant="standard">
-              <InputLabel htmlFor="fringe-user-password">Password</InputLabel>
-              <Input
-                id="fringe-user-password"
-                readOnly={true}
-                disabled={true}
-                type="text"
-                value={currentUser?.password}
-                endAdornment={
-                  <InputAdornment position="end">
-                    <IconButton
-                      aria-label="copy password to clipboard"
-                      onClick={copyUserPassword}
-                      edge="end"
-                    >
-                      { passwordCopied ? (<CheckCircleOutlineRounded />) : (<CopyAllRounded />)}
-                    </IconButton>
-                  </InputAdornment>
-                }
-              />
-            </FormControl>
+            <PasswordField loading={false} password={currentUser?.password} sx={{width: 1}}/>
           )}
-
         </Box>
       </Paper>
-      <Modal
-        aria-labelledby="transition-modal-title"
-        aria-describedby="transition-modal-description"
-        open={warningModalOpen}
-        onClose={cancelWarningModal}
-        closeAfterTransition
-        BackdropComponent={Backdrop}
-        BackdropProps={{timeout: 500}}>
-        <Fade in={warningModalOpen}>
-          <Box sx={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            width: 400,
-            bgcolor: 'background.paper',
-            border: '2px solid #000',
-            boxShadow: 24,
-            p: 4}}>
-            <Stack direction="row" alignItems="center" gap={1}>
-              <WarningOutlined />
-              <Typography id="transition-modal-title" variant="h6" component="h2">
-                Replacing Password
-              </Typography>
-            </Stack>
-            <Typography id="transition-modal-description" sx={{mt: 2}}>
-              Creating a new password will remove the previous password. Only one password can exist at a time.
-            </Typography>
-            <Box sx={{marginTop: 2}}/>
-            <Stack direction="row" justifyContent="flex-end" alignItems="center" spacing={2}>
-              <Button onClick={cancelWarningModal} variant="outlined" color="error">Take me back</Button>
-              <Button onClick={confirmWarningModal} variant="contained">Understood</Button>
-            </Stack>
-          </Box>
-        </Fade>
-      </Modal>
-
-
     </Container>
-
-
   );
 }
 

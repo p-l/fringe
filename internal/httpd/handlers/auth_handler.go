@@ -26,6 +26,7 @@ type LoginResponse struct {
 	TokenType string `json:"token_type"`
 	Token     string `json:"token"`
 	Duration  int64  `json:"duration"`
+	Role      string `json:"role"`
 }
 
 func NewAuthHandler(userRepo *repos.UserRepository, googleOAuthService *services.GoogleOAuthService, authHelper *helpers.AuthHelper) *AuthHandler {
@@ -66,12 +67,12 @@ func (a *AuthHandler) Login(httpResponse http.ResponseWriter, httpRequest *http.
 		return
 	}
 
-	permissions := a.authHelper.PermissionsForEmail(googleUserInfo.Email)
-	claims := helpers.NewAuthClaims(googleUserInfo.Email, googleUserInfo.Name, googleUserInfo.Picture, permissions)
+	role := a.authHelper.RoleForEmail(googleUserInfo.Email)
+	claims := helpers.NewAuthClaims(googleUserInfo.Email, googleUserInfo.Name, googleUserInfo.Picture, role)
 	signedTokenString := a.authHelper.NewJWTSignedString(claims)
 	duration := time.Unix(claims.ExpiresAt, 0).Unix() - time.Now().Unix()
 
-	response := LoginResponse{TokenType: "Bearer", Token: signedTokenString, Duration: duration}
+	response := LoginResponse{TokenType: "Bearer", Token: signedTokenString, Duration: duration, Role: role}
 
 	jsonResponse, err := json.Marshal(response)
 	if err != nil {
