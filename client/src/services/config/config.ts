@@ -15,7 +15,7 @@ class Config {
       error: null,
     };
 
-    this.apiRootURL = 'https://'+window.location.host+'/api/';
+    this.apiRootURL = `https://${window.location.host}/api/`;
     this.googleClientID = '';
   }
 
@@ -45,7 +45,7 @@ class Config {
       this.state.loaded = false;
       this.state.error = e;
 
-      console.warn(`⚙️ Config failed to load from ${this.configApiURL()}: ${e}`); // e can be anything, really
+      console.warn(`⚙️ Config failed to load from ${this.configApiURL()}: ${e}`);
       loaded(false, this);
     });
   }

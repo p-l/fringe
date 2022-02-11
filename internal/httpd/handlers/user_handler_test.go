@@ -103,8 +103,8 @@ func TestUserHandler_Delete(t *testing.T) {
 			Permissions: "",
 		}
 
-		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/user/%s/delete", regularUserEmail), nil)
-		res := makeRequestToHandlerWithClaims(&claims, "/user/{email}/delete", userHandler.Delete, req)
+		req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/user/%s", regularUserEmail), nil)
+		res := makeRequestToHandlerWithClaims(&claims, "/user/{email}", userHandler.Delete, req)
 
 		assert.Equal(t, http.StatusUnauthorized, res.Result().StatusCode)
 	})
@@ -124,12 +124,10 @@ func TestUserHandler_Delete(t *testing.T) {
 		assert.Equal(t, regularUserEmail, user.Email)
 
 		// Delete
-		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/user/%s/delete", regularUserEmail), nil)
-		res := makeRequestToHandlerWithClaims(&claims, "/user/{email}/delete", userHandler.Delete, req)
-		location, _ := res.Result().Location()
+		req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/user/%s", regularUserEmail), nil)
+		res := makeRequestToHandlerWithClaims(&claims, "/user/{email}", userHandler.Delete, req)
 
-		assert.Equal(t, http.StatusFound, res.Result().StatusCode)
-		assert.Contains(t, location.Path, "/user/")
+		assert.Equal(t, http.StatusOK, res.Result().StatusCode)
 
 		// User nolonger in database
 		user, err = userRepo.FindByEmail(regularUserEmail)

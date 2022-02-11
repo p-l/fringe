@@ -51,7 +51,8 @@ func NewHTTPServer(config system.Config, repo *repos.UserRepository, clientAsset
 	// Hook the handlers
 	router.HandleFunc("/api/auth/", authHandler.Login).Methods(http.MethodPost)
 	router.HandleFunc("/api/config/", configHandler.Root).Methods(http.MethodGet)
-	router.HandleFunc("/api/users/", userHandler.List).Methods("GET")
+	router.HandleFunc("/api/users/", userHandler.List).Methods(http.MethodGet)
+	router.HandleFunc("/api/users/", userHandler.Create).Methods(http.MethodPost)
 	router.HandleFunc("/api/users/{email}/", userHandler.View).Methods(http.MethodGet)
 	router.HandleFunc("/api/users/{email}/", userHandler.Delete).Methods(http.MethodDelete)
 	router.HandleFunc("/api/users/{email}/renew/", userHandler.Renew).Methods(http.MethodGet)
@@ -95,7 +96,7 @@ func addCORS(allowedOrigins []string, router *mux.Router) http.Handler {
 	corsHandler := cors.New(cors.Options{
 		AllowCredentials: false,
 		AllowedOrigins:   allowedOrigins,
-		AllowedMethods:   []string{http.MethodGet, http.MethodPost, http.MethodOptions},
+		AllowedMethods:   []string{http.MethodGet, http.MethodPost, http.MethodOptions, http.MethodDelete},
 		AllowedHeaders:   []string{"accept", "authorization", "content-type"},
 		MaxAge:           int(preFlightCacheMaxAge.Seconds()),
 		Debug:            true,

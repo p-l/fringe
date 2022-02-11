@@ -68,7 +68,7 @@ function Me() {
       <Box sx={{marginTop: 5, display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
         <Avatar
           sx={{bgcolor: theme.palette.primary.main, width: 96, height: 96}}
-          alt={ currentUser?.email }
+          alt={ currentUser?.email.toLocaleUpperCase() }
           src={ currentUser?.picture }
         />
         <Typography component="h1" variant="h5" sx={{p: 1}}>

@@ -16,7 +16,8 @@ import Config from './services/config';
 
 const appConfig = new Config();
 
-appConfig.apiRootURL = (process.env.REACT_APP_API_URL? process.env.REACT_APP_API_URL : '/api');
+appConfig.apiRootURL = (process.env.REACT_APP_API_URL? process.env.REACT_APP_API_URL : `https://${window.location.host}/api/`);
+
 appConfig.waitForConfigFromAPI( (_, config : Config) => {
   ReactDOM.render(
       <React.StrictMode>

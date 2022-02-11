@@ -27,24 +27,26 @@ function Application(props: ApplicationProps) {
   });
 
   return (
-    <ErrorBoundary>
-      <Suspense fallback={
-        <Container maxWidth="xs">
-          <Box sx={{p: 50, m: 50, display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
-            <CircularProgress />
-          </Box>
-        </Container>
-      }>
-        <AuthProvider>
-          <NavBar config={props.config}/>
-          <Routes>
-            <Route path="/" element={<RequireAuth><Me /></RequireAuth>} />
-            <Route path="/admin" element={<RequireAuth><Admin /></RequireAuth>} />
-            <Route path="/login" element={<Login googleClientID={props.config.googleClientID} />} />
-          </Routes>
-        </AuthProvider>
-      </Suspense>
-    </ErrorBoundary>
+    <React.StrictMode>
+      <ErrorBoundary>
+        <Suspense fallback={
+          <Container maxWidth="xs">
+            <Box sx={{p: 50, m: 50, display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
+              <CircularProgress />
+            </Box>
+          </Container>
+        }>
+          <AuthProvider>
+            <NavBar config={props.config}/>
+            <Routes>
+              <Route path="/" element={<RequireAuth><Me /></RequireAuth>} />
+              <Route path="/admin" element={<RequireAuth><Admin /></RequireAuth>} />
+              <Route path="/login" element={<Login googleClientID={props.config.googleClientID} />} />
+            </Routes>
+          </AuthProvider>
+        </Suspense>
+      </ErrorBoundary>
+    </React.StrictMode>
   );
 }
 

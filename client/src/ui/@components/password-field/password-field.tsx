@@ -31,7 +31,7 @@ function PasswordField(props: {loading: boolean, password?: string|null|undefine
           type="text"
           value={props.loading ? 'Loading' : props.password }
           startAdornment={
-            props.loading && (<InputAdornment position="start"><CircularProgress sx={{m: 0, maxHeight: 22, maxWidth: 22}}/></InputAdornment>)
+            props.loading && (<InputAdornment position="start"><CircularProgress size={14} /></InputAdornment>)
           }
           endAdornment={!props.loading && (
             <InputAdornment position="end">

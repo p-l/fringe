@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -20,6 +21,11 @@ type UserHandler struct {
 	authHelper *helpers.AuthHelper
 }
 
+type UserCreateRequest struct {
+	Email string `json:"email"`
+	Name  string `json:"name"`
+}
+
 type UserResponse struct {
 	Email             string `json:"email"`
 	Name              string `json:"name"`
@@ -28,6 +34,18 @@ type UserResponse struct {
 	PasswordUpdatedAt int64  `json:"password_updated_at"`
 	LastSeenAt        int64  `json:"last_seen_at"`
 }
+
+type UserActionResponse struct {
+	Result string        `json:"result"`
+	User   *UserResponse `json:"user"`
+}
+
+const (
+	actionResultSuccess  = "success"
+	actionResultFailed   = "failed"
+	actionResultNotFound = "not_found"
+	actionResultExists   = "exists"
+)
 
 const (
 	newUserPasswordLen          = 24
@@ -52,6 +70,112 @@ func forceHTTPNoCache(httpResponse http.ResponseWriter) {
 	httpResponse.Header().Add("Expires", "0")
 }
 
+func renderUserResponse(httpResponse http.ResponseWriter, httpRequest *http.Request, user *repos.User, pwd string) {
+	response := UserResponse{
+		Email:             user.Email,
+		Name:              user.Name,
+		Picture:           user.Picture,
+		LastSeenAt:        user.LastSeenAt,
+		PasswordUpdatedAt: user.PasswordUpdatedAt,
+		Password:          pwd,
+	}
+
+	jsonResponse, err := json.Marshal(response)
+	if err != nil {
+		log.Printf("User [src:%v] failed to encode %s user response: %v", httpRequest.RemoteAddr, user.Email, err)
+		http.Error(httpResponse, err.Error(), http.StatusInternalServerError)
+
+		return
+	}
+
+	httpResponse.Header().Set("Content-Type", "application/json")
+
+	_, err = httpResponse.Write(jsonResponse)
+	if err != nil {
+		log.Printf("User [src:%v] failed to send response: %v", httpRequest.RemoteAddr, err)
+		http.Error(httpResponse, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func renderActionResponse(httpResponse http.ResponseWriter, httpRequest *http.Request, response *UserActionResponse) {
+	jsonResponse, err := json.Marshal(response)
+	if err != nil {
+		log.Printf("User [src:%v] failed to encode action response: %v", httpRequest.RemoteAddr, err)
+		http.Error(httpResponse, err.Error(), http.StatusInternalServerError)
+
+		return
+	}
+
+	httpResponse.Header().Set("Content-Type", "application/json")
+
+	_, err = httpResponse.Write(jsonResponse)
+	if err != nil {
+		log.Printf("User [src:%v] failed to send response: %v", httpRequest.RemoteAddr, err)
+		http.Error(httpResponse, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func renderUserListResponse(httpResponse http.ResponseWriter, httpRequest *http.Request, users []repos.User) {
+	returnedUsers := make([]UserResponse, 0, len(users))
+	for _, user := range users {
+		returnedUsers = append(returnedUsers, UserResponse{
+			Email:             user.Email,
+			Name:              user.Name,
+			Picture:           user.Picture,
+			PasswordUpdatedAt: user.PasswordUpdatedAt,
+			LastSeenAt:        user.LastSeenAt,
+			Password:          "",
+		})
+	}
+
+	jsonResponse, err := json.Marshal(returnedUsers)
+	if err != nil {
+		log.Printf("User [src:%v] failed to encode user list: %v", httpRequest.RemoteAddr, err)
+		http.Error(httpResponse, err.Error(), http.StatusInternalServerError)
+
+		return
+	}
+
+	httpResponse.Header().Set("Content-Type", "application/json")
+
+	_, err = httpResponse.Write(jsonResponse)
+	if err != nil {
+		log.Printf("Auth [src:%v] failed to send user list: %v", httpRequest.RemoteAddr, err)
+		http.Error(httpResponse, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func isAuthorizedAdminRequest(httpRequest *http.Request) (authorized bool) {
+	claims, ok := helpers.AuthClaimsFromContext(httpRequest.Context())
+	if !ok {
+		log.Printf("User [%v]: failed to retrieve claims", httpRequest.RemoteAddr)
+
+		return false
+	}
+
+	if !claims.IsAdmin() {
+		log.Printf("[%v]: %s is not allowed to perform action", httpRequest.RemoteAddr, claims.Email)
+
+		return false
+	}
+
+	return true
+}
+
+func createNewUser(repo *repos.UserRepository, email string, name string, picture string) (user *repos.User, userPassword *string, err error) {
+	pwd, err := password.Generate(newUserPasswordLen, newUserPasswordNumOfDigits, newUserPasswordNumOfSymbols, false, false)
+	if err != nil {
+		return nil, nil, fmt.Errorf("password generation failed: %w", err)
+	}
+
+	user, err = repo.Create(email, name, picture, pwd)
+	if err != nil {
+		return nil, nil, fmt.Errorf("user creation failed: %w", err)
+	}
+
+	return user, &pwd, nil
+}
+
 func (u *UserHandler) List(httpResponse http.ResponseWriter, httpRequest *http.Request) {
 	defer func() { _ = httpRequest.Body.Close() }()
 
@@ -61,6 +185,7 @@ func (u *UserHandler) List(httpResponse http.ResponseWriter, httpRequest *http.R
 	pageSize := 10
 	pageQueried := sanitize.AlphaNumeric(httpRequest.URL.Query().Get("page"), false)
 	perPage := sanitize.AlphaNumeric(httpRequest.URL.Query().Get("per_page"), false)
+	searchQuery := sanitize.SingleLine(sanitize.Punctuation(httpRequest.URL.Query().Get("search")))
 
 	if len(pageQueried) > 0 {
 		pageNumber, err = strconv.Atoi(pageQueried)
@@ -78,27 +203,29 @@ func (u *UserHandler) List(httpResponse http.ResponseWriter, httpRequest *http.R
 		}
 	}
 
-	claims, ok := helpers.AuthClaimsFromContext(httpRequest.Context())
-	if !ok {
-		log.Printf("User/List [%v]: failed to retrieve claims", httpRequest.RemoteAddr)
-		http.Error(httpResponse, "could not extract claims from context", http.StatusInternalServerError)
-
-		return
-	}
-
-	if !claims.IsAdmin() {
-		log.Printf("User/List [%v]: %s is not allowed to list users", httpRequest.RemoteAddr, claims.Email)
+	if !isAuthorizedAdminRequest(httpRequest) {
 		http.Error(httpResponse, "not authorized to list users", http.StatusUnauthorized)
 
 		return
 	}
 
-	users, err := u.userRepo.AllUsers(pageSize, pageNumber)
+	var users []repos.User
+	if len(searchQuery) > 0 {
+		users, err = u.userRepo.FindAllMatching(searchQuery, pageSize, pageNumber)
+	} else {
+		users, err = u.userRepo.AllUsers(pageSize, pageNumber)
+	}
+
 	if err != nil {
-		log.Printf("User/List [%v]: %s could not get user list (page:%d, pageSize:%d)", httpRequest.RemoteAddr, claims.Email, pageNumber, pageSize)
-		http.Error(httpResponse, "not authorized to list users", http.StatusUnauthorized)
+		if errors.Is(err, repos.ErrUserNotFound) {
+			log.Printf("User/List [%v]: query for users (search=%s) and had no results", httpRequest.RemoteAddr, searchQuery)
+			users = []repos.User{}
+		} else {
+			log.Printf("User/List [%v]: could not get user list (page:%d, pageSize:%d): %v", httpRequest.RemoteAddr, pageNumber, pageSize, err)
+			http.Error(httpResponse, "not authorized to list users", http.StatusUnauthorized)
 
-		return
+			return
+		}
 	}
 
 	renderUserListResponse(httpResponse, httpRequest, users)
@@ -125,22 +252,17 @@ func (u *UserHandler) View(httpResponse http.ResponseWriter, httpRequest *http.R
 	userPassword := ""
 
 	user, err := u.userRepo.FindByEmail(email)
-	if errors.Is(err, repos.ErrUserNotFound) {
-		userPassword, err = password.Generate(newUserPasswordLen, newUserPasswordNumOfDigits, newUserPasswordNumOfSymbols, false, false)
+	if errors.Is(err, repos.ErrUserNotFound) && strings.EqualFold(email, claims.Email) {
+		newUser, pwd, err := createNewUser(u.userRepo, claims.Email, claims.Name, claims.Picture)
 		if err != nil {
-			log.Printf("User/New [%v]: Fail to create user %s: %v", httpRequest.RemoteAddr, email, err)
-			http.Error(httpResponse, "failed to create user", http.StatusInternalServerError)
+			log.Printf("User/View [%v]: %s requested %s but failed: %v", httpRequest.RemoteAddr, claims.Email, email, err)
+			http.Error(httpResponse, err.Error(), http.StatusNotFound)
 
 			return
 		}
 
-		user, err = u.userRepo.Create(claims.Email, claims.Name, claims.Picture, userPassword)
-		if err != nil && !errors.Is(err, repos.ErrUserAlreadyExist) {
-			log.Printf("User/New [%v]: Fail to create user %s: %v", httpRequest.RemoteAddr, email, err)
-			http.Error(httpResponse, "failed to create user", http.StatusInternalServerError)
-
-			return
-		}
+		userPassword = *pwd
+		user = newUser
 	} else if err != nil {
 		log.Printf("User/View [%v]: %s requested %s but failed: %v", httpRequest.RemoteAddr, claims.Email, email, err)
 		http.Error(httpResponse, err.Error(), http.StatusNotFound)
@@ -211,94 +333,97 @@ func (u *UserHandler) Renew(httpResponse http.ResponseWriter, httpRequest *http.
 func (u *UserHandler) Delete(httpResponse http.ResponseWriter, httpRequest *http.Request) {
 	defer func() { _ = httpRequest.Body.Close() }()
 
-	claims, _ := helpers.AuthClaimsFromContext(httpRequest.Context())
 	vars := mux.Vars(httpRequest)
 	email := sanitize.Email(vars["email"], false)
 
-	if !claims.IsAdmin() {
-		log.Printf("User/Delete [%v]: %s attempted to delete user %s without permission", httpRequest.RemoteAddr, claims.Email, email)
-		http.Error(httpResponse, "not authorized to delete users", http.StatusUnauthorized)
+	if !isAuthorizedAdminRequest(httpRequest) {
+		http.Error(httpResponse, "not authorized to delete user", http.StatusUnauthorized)
 
 		return
 	}
 
 	if !helpers.IsEmailValid(email) {
 		log.Printf("User/Delete [%v]: Invalid email: %s", httpRequest.RemoteAddr, email)
-		http.Redirect(httpResponse, httpRequest, "/", http.StatusFound)
+		http.Error(httpResponse, "invalid email", http.StatusBadRequest)
 
 		return
 	}
+
+	response := UserActionResponse{}
 
 	err := u.userRepo.Delete(email)
-	if err != nil && !errors.Is(err, repos.ErrUserNotFound) {
-		log.Printf("User/Delete [%v]: failed to delete %s : %v", httpRequest.RemoteAddr, email, err)
-		http.Error(httpResponse, "operation failed", http.StatusInternalServerError)
+	if err != nil {
+		log.Printf("User/Delete [%v]: failed to delete: %s : %v", httpRequest.RemoteAddr, email, err)
+		response.Result = actionResultFailed
 
-		return
-	}
-
-	if errors.Is(err, repos.ErrUserNotFound) {
-		log.Printf("User/Delete [%v]: user %s doesn't exist", httpRequest.RemoteAddr, email)
+		if errors.Is(err, repos.ErrUserNotFound) {
+			response.Result = actionResultNotFound
+		}
 	} else {
-		log.Printf("User/Delete [%v]: user %s DELETED", httpRequest.RemoteAddr, email)
+		log.Printf("User/Delete [%v]: user %s Deleted", httpRequest.RemoteAddr, email)
+
+		response.Result = actionResultSuccess
 	}
 
-	http.Redirect(httpResponse, httpRequest, "/user/", http.StatusFound)
+	renderActionResponse(httpResponse, httpRequest, &response)
 }
 
-func renderUserResponse(httpResponse http.ResponseWriter, httpRequest *http.Request, user *repos.User, pwd string) {
-	response := UserResponse{
-		Email:             user.Email,
-		Name:              user.Name,
-		Picture:           user.Picture,
-		LastSeenAt:        user.LastSeenAt,
-		PasswordUpdatedAt: user.PasswordUpdatedAt,
-		Password:          pwd,
-	}
+func (u *UserHandler) Create(httpResponse http.ResponseWriter, httpRequest *http.Request) {
+	defer func() { _ = httpRequest.Body.Close() }()
 
-	jsonResponse, err := json.Marshal(response)
+	var request UserCreateRequest
+	decoder := json.NewDecoder(httpRequest.Body)
+
+	err := decoder.Decode(&request)
 	if err != nil {
-		log.Printf("User [src:%v] failed to encode %s user response: %v", httpRequest.RemoteAddr, user.Email, err)
-		http.Error(httpResponse, err.Error(), http.StatusInternalServerError)
+		log.Printf("User/Create [src:%v] invalid post data %v", httpRequest.RemoteAddr, err)
+		http.Error(httpResponse, "Unable decode request", http.StatusBadRequest)
 
 		return
 	}
 
-	httpResponse.Header().Set("Content-Type", "application/json")
+	email := sanitize.Email(request.Email, false)
+	name := sanitize.SingleLine(sanitize.Punctuation(request.Name))
 
-	_, err = httpResponse.Write(jsonResponse)
-	if err != nil {
-		log.Printf("Auth [src:%v] failed to send response %s user response: %v", httpRequest.RemoteAddr, user.Email, err)
-		http.Error(httpResponse, err.Error(), http.StatusInternalServerError)
+	if !isAuthorizedAdminRequest(httpRequest) {
+		http.Error(httpResponse, "not authorized to create user", http.StatusUnauthorized)
+
+		return
 	}
-}
 
-func renderUserListResponse(httpResponse http.ResponseWriter, httpRequest *http.Request, users []repos.User) {
-	returnedUsers := make([]UserResponse, 0, len(users))
-	for _, user := range users {
-		returnedUsers = append(returnedUsers, UserResponse{
+	if !helpers.IsEmailValid(email) {
+		log.Printf("User/Create [%v]: Invalid email: %s", httpRequest.RemoteAddr, email)
+		http.Error(httpResponse, "invalid email", http.StatusBadRequest)
+
+		return
+	}
+
+	if !helpers.IsEmailInDomain(email, u.authHelper.AllowedDomain) {
+		log.Printf("User/Create [%v]: Invalid email: %s", httpRequest.RemoteAddr, email)
+		http.Error(httpResponse, "email outside of authorized domain", http.StatusBadRequest)
+
+		return
+	}
+
+	response := UserActionResponse{}
+
+	user, pwd, err := createNewUser(u.userRepo, email, name, "")
+	if err != nil {
+		log.Printf("User/Create [%v]: failed to create: %s : %v", httpRequest.RemoteAddr, email, err)
+		response.Result = actionResultExists
+	} else {
+		log.Printf("User/Create [%v]: user %s Created", httpRequest.RemoteAddr, email)
+
+		response.Result = actionResultSuccess
+		response.User = &UserResponse{
 			Email:             user.Email,
 			Name:              user.Name,
 			Picture:           user.Picture,
+			Password:          *pwd,
 			PasswordUpdatedAt: user.PasswordUpdatedAt,
 			LastSeenAt:        user.LastSeenAt,
-			Password:          "",
-		})
+		}
 	}
 
-	jsonResponse, err := json.Marshal(returnedUsers)
-	if err != nil {
-		log.Printf("User [src:%v] failed to encode user list: %v", httpRequest.RemoteAddr, err)
-		http.Error(httpResponse, err.Error(), http.StatusInternalServerError)
-
-		return
-	}
-
-	httpResponse.Header().Set("Content-Type", "application/json")
-
-	_, err = httpResponse.Write(jsonResponse)
-	if err != nil {
-		log.Printf("Auth [src:%v] failed to send user list: %v", httpRequest.RemoteAddr, err)
-		http.Error(httpResponse, err.Error(), http.StatusInternalServerError)
-	}
+	renderActionResponse(httpResponse, httpRequest, &response)
 }

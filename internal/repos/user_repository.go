@@ -314,7 +314,32 @@ func (r *UserRepository) AllUsers(limit int, page int) ([]User, error) {
 
 	var users []User
 
-	err := r.db.Select(&users, "SELECT * FROM users ORDER BY email LIMIT $1 OFFSET $2 ", limit, offset)
+	err := r.db.Select(&users, "SELECT * FROM users ORDER BY last_seen_at DESC LIMIT $1 OFFSET $2 ", limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve users (limit: %d offset:%d) %w", limit, offset, err)
+	}
+
+	if users == nil {
+		return nil, ErrUserNotFound
+	}
+
+	return users, nil
+}
+
+func (r *UserRepository) FindAllMatching(searchQuery string, limit int, page int) ([]User, error) {
+	offset := 0
+
+	if limit == 0 || limit > UserRepositoryListMaxLimit {
+		limit = UserRepositoryListMaxLimit
+	}
+
+	if page > 1 {
+		offset = (page - 1) * limit
+	}
+
+	var users []User
+
+	err := r.db.Select(&users, "SELECT * FROM users WHERE (email LIKE $1 OR name LIKE $1) ORDER BY email LIMIT $2 OFFSET $3 ", searchQuery, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve users (limit: %d offset:%d) %w", limit, offset, err)
 	}
