@@ -6,7 +6,7 @@ class AuthService {
   private _userAuth: UserAuth|null;
 
   public constructor() {
-    this.apiRootURL = 'https://'+window.location.host+'/api/';
+    this.apiRootURL = `https://${window.location.host}/api/`;
     this._userAuth = null;
 
     const localToken = localStorage.getItem('token');

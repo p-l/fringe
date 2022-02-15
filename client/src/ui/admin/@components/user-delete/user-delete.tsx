@@ -1,13 +1,14 @@
 import React from 'react';
-import {Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Snackbar} from '@mui/material';
+import {Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, IconButton} from '@mui/material';
 import {DeleteRounded} from '@mui/icons-material';
+import {Trans, useTranslation} from 'react-i18next';
 import {User} from '../../../../models/user';
 import {useUserService} from '../../../../services/user/user-service';
 
 function UserDelete(props:{user: User, onDelete:(user: User) => void}) {
   const [confirmationOpened, setConfirmationOpened] = React.useState<boolean>(false);
-  const [deleted, setDeleted] = React.useState<boolean>(false);
   const userService = useUserService();
+  const {t} = useTranslation();
 
   const deleteButtonPressed = () => {
     setConfirmationOpened(true);
@@ -21,7 +22,6 @@ function UserDelete(props:{user: User, onDelete:(user: User) => void}) {
     setConfirmationOpened(false);
     userService.delete(props.user.email, (resultText) => {
       if (resultText == 'success') {
-        setDeleted(true);
         props.onDelete(props.user);
       }
     });
@@ -29,24 +29,18 @@ function UserDelete(props:{user: User, onDelete:(user: User) => void}) {
 
   return (
     <Box>
-      <IconButton onClick={deleteButtonPressed}>
+      <IconButton aria-label={t('userDelete.ariaLabel', {email: props.user.email})} onClick={deleteButtonPressed}>
         <DeleteRounded />
       </IconButton>
       {/* Confirm Delete */}
       <Dialog open={confirmationOpened}>
-        <DialogTitle>Delete {props.user.email}?</DialogTitle>
-        <DialogContent>Remove user from the database. This does not prevent the user from enrolling again later.</DialogContent>
+        <DialogTitle><Trans i18nKey='userDelete.dialogTitle' values={{email: props.user.email}} /></DialogTitle>
+        <DialogContent><Trans i18nKey='userDelete.dialogInstruction' /></DialogContent>
         <DialogActions>
-          <Button onClick={cancelUserDelete}>Cancel</Button>
-          <Button onClick={confirmUserDelete} color="error">Delete</Button>
+          <Button onClick={cancelUserDelete}><Trans i18nKey='actions.cancel' /></Button>
+          <Button onClick={confirmUserDelete} color="error"><Trans i18nKey='actions.delete'/></Button>
         </DialogActions>
       </Dialog>
-      <Snackbar
-        autoHideDuration={3000}
-        open={deleted}
-        onClose={() => setDeleted(false)}
-        message={`User ${props.user.email} was deleted`}
-      />
     </Box>);
 }
 

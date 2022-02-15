@@ -1,6 +1,7 @@
 import {PersonAddRounded} from '@mui/icons-material';
 import {Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, SxProps, TextField, Theme, Typography} from '@mui/material';
 import React from 'react';
+import {Trans, useTranslation} from 'react-i18next';
 import validator from 'validator';
 import {User} from '../../../../models/user';
 import {useUserService} from '../../../../services/user/user-service';
@@ -18,6 +19,7 @@ function UserAdd(props: {onCreation:(user: User) => void, sx?: SxProps<Theme>|un
   const [passwordDialogTitle, setPasswordDialogTitle] = React.useState<string>('');
   const [password, setPassword] = React.useState<string|null>(null);
   const userService = useUserService();
+  const {t} = useTranslation();
 
   const resetAddDialog = () => {
     setEmail('');
@@ -54,24 +56,26 @@ function UserAdd(props: {onCreation:(user: User) => void, sx?: SxProps<Theme>|un
         resetAddDialog();
         if (user.password) {
           setPassword(user.password);
-          setPasswordDialogTitle(`Password for ${user.email}`);
+          setPasswordDialogTitle(t('passwordDialog.newUserTitle', {email: user.email}));
           setPasswordDialogOpened(true);
         }
       } else {
-        setError(`Failed to create user (${resultText})`);
+        setError(t('userAdd.failure', {resultCode: resultText}));
       }
     });
   };
 
   return (
     <Box>
-      <IconButton onClick={openCreationDialog} sx={props.sx} ><PersonAddRounded /></IconButton>
+      <IconButton aria-label={t('userAdd.ariaLabel')} onClick={openCreationDialog} sx={props.sx} >
+        <PersonAddRounded />
+      </IconButton>
       {/* Creation Form */}
       <Dialog open={creationDialogOpened} >
-        <DialogTitle>Add a new user</DialogTitle>
+        <DialogTitle><Trans i18nKey='userAdd.dialogTitle' /></DialogTitle>
         { error != null && (<Alert severity="error">{error}</Alert>) }
         <DialogContent>
-          <Typography>Create a new user</Typography>
+          <Typography><Trans i18nKey='userAdd.dialogInstruction' /></Typography>
           <TextField
             fullWidth
             required
@@ -84,13 +88,13 @@ function UserAdd(props: {onCreation:(user: User) => void, sx?: SxProps<Theme>|un
             }}
             margin="dense"
             id="email"
-            label="Email"
+            label={t('userAdd.emailLabel')}
           />
           <TextField
             fullWidth
             margin="dense"
             id="name"
-            label="Name"
+            label={t('userAdd.nameLabel')}
             onChange={(event) => {
               const input = event.target.value;
               setName(input);
@@ -98,8 +102,8 @@ function UserAdd(props: {onCreation:(user: User) => void, sx?: SxProps<Theme>|un
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={closeCreationDialog}>Cancel</Button>
-          <Button disabled={!isEmailValid || creating} onClick={() => createUser()}>Add</Button>
+          <Button onClick={closeCreationDialog}><Trans i18nKey='actions.cancel' /></Button>
+          <Button disabled={!isEmailValid || creating} onClick={() => createUser()}><Trans i18nKey='actions.add' /></Button>
 
         </DialogActions>
       </Dialog>

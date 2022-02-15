@@ -25,7 +25,6 @@ function Application(props: ApplicationProps) {
     authService.apiRootURL = props.config.apiRootURL;
     userService.apiRootURL = props.config.apiRootURL;
   });
-
   return (
     <React.StrictMode>
       <ErrorBoundary>

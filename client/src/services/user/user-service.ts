@@ -5,7 +5,7 @@ class UserService {
   apiRootURL: string;
 
   public constructor() {
-    this.apiRootURL = 'https://'+window.location.host+'/api/';
+    this.apiRootURL = `https://${window.location.host}/api/`;
   }
 
   userApiURL() :string {

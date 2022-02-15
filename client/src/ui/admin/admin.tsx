@@ -1,6 +1,8 @@
 import React from 'react';
 import {MoreRounded} from '@mui/icons-material';
 import {Avatar, Box, Button, CircularProgress, Container, Stack, Table, TableContainer, TableRow, TableCell, TableBody, TableHead} from '@mui/material';
+import {Trans} from 'react-i18next';
+import {differenceInDays} from 'date-fns';
 
 import {User} from '../../models/user';
 import {useUserService} from '../../services/user/user-service';
@@ -67,10 +69,10 @@ function Admin() {
           <TableHead sx={{display: {xs: 'none', sm: 'none', md: 'table-header-group', lg: 'table-header-group', xl: 'table-header-group'}}}>
             <TableRow>
               <TableCell sx={{paddingLeft: 0}}>&nbsp;</TableCell>
-              <TableCell sx={{paddingLeft: 0}} align="left">Email</TableCell>
-              <TableCell align="left" sx={{display: {xs: 'none', sm: 'table-cell', md: 'table-cell', lg: 'table-cell', xl: 'table-cell'}, paddingLeft: 0}}>Name</TableCell>
-              <TableCell align="left" sx={{display: {xs: 'none', sm: 'none', md: 'table-cell', lg: 'table-cell', xl: 'table-cell'}, paddingLeft: 0}}>Last Seen</TableCell>
-              <TableCell align="left" sx={{display: {xs: 'none', sm: 'none', md: 'table-cell', lg: 'table-cell', xl: 'table-cell'}, paddingLeft: 0}}>Last Password Change</TableCell>
+              <TableCell sx={{paddingLeft: 0}} align="left"><Trans i18nKey='admin.headerEmail' /></TableCell>
+              <TableCell align="left" sx={{display: {xs: 'none', sm: 'table-cell', md: 'table-cell', lg: 'table-cell', xl: 'table-cell'}, paddingLeft: 0}}><Trans i18nKey='admin.headerName' /></TableCell>
+              <TableCell align="left" sx={{display: {xs: 'none', sm: 'none', md: 'table-cell', lg: 'table-cell', xl: 'table-cell'}, paddingLeft: 0}}><Trans i18nKey='admin.headerLastSeen' /></TableCell>
+              <TableCell align="left" sx={{display: {xs: 'none', sm: 'none', md: 'table-cell', lg: 'table-cell', xl: 'table-cell'}, paddingLeft: 0}}><Trans i18nKey='admin.headerPasswordAge' /></TableCell>
               <TableCell sx={{paddingRight: 0, maxWidth: 20}} align="right">&nbsp;</TableCell>
             </TableRow>
           </TableHead>
@@ -80,15 +82,29 @@ function Admin() {
                 key={user.email}
                 sx={{'&:last-child td, &:last-child th': {border: 0}}}
               >
+                {/* Avatar */}
                 <TableCell sx={{paddingLeft: 0}} >
                   <Avatar
                     alt={ user.email.toLocaleUpperCase() }
                     src={ user.picture } />
                 </TableCell>
-                <TableCell sx={{paddingLeft: 0}} align="left">{user.email}</TableCell>
-                <TableCell align="left" sx={{display: {xs: 'none', sm: 'table-cell', md: 'table-cell', lg: 'table-cell', xl: 'table-cell'}, paddingLeft: 0}}>{user.name}</TableCell>
-                <TableCell align="left" sx={{display: {xs: 'none', sm: 'none', md: 'table-cell', lg: 'table-cell', xl: 'table-cell'}, paddingLeft: 0}}>{user.lastSeen()}</TableCell>
-                <TableCell align="left" sx={{display: {xs: 'none', sm: 'none', md: 'table-cell', lg: 'table-cell', xl: 'table-cell'}, paddingLeft: 0}}>{user.passwordAgeInDays()} days ago</TableCell>
+                {/* Email */}
+                <TableCell sx={{paddingLeft: 0}} align="left">
+                  {user.email}
+                </TableCell>
+                {/* Full Name */}
+                <TableCell align="left" sx={{display: {xs: 'none', sm: 'table-cell', md: 'table-cell', lg: 'table-cell', xl: 'table-cell'}, paddingLeft: 0}}>
+                  {user.name}
+                </TableCell>
+                {/* Last Seen Date */}
+                <TableCell align="left" sx={{display: {xs: 'none', sm: 'none', md: 'table-cell', lg: 'table-cell', xl: 'table-cell'}, paddingLeft: 0}}>
+                  <Trans i18nKey='admin.lastSeen' values={{lastSeenDate: user.lastSeenAt, formatParams: {lastSeenDate: {weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: false, timeZoneName: 'short'}}}} />
+                </TableCell>
+                {/* Password age */}
+                <TableCell align="left" sx={{display: {xs: 'none', sm: 'none', md: 'table-cell', lg: 'table-cell', xl: 'table-cell'}, paddingLeft: 0}}>
+                  <Trans i18nKey='admin.passwordAge' values={{count: differenceInDays(user.passwordUpdatedAt, Date.now()), passwordAge: differenceInDays(user.passwordUpdatedAt, Date.now())}} />
+                </TableCell>
+                {/* Actions */}
                 <TableCell sx={{paddingRight: 0}} align="right">
                   <Stack direction="row" spacing={0} justifyContent="flex-end">
                     <UserDelete user={user} onDelete={(deletedUser) => {
@@ -112,7 +128,7 @@ function Admin() {
           onClick={loadMoreUsers}
           disabled={loading || !hasMore}
           startIcon={loading ? <CircularProgress size={12} /> : <MoreRounded />}
-        >{hasMore ? (`More Results`) : (`No More Users`)}</Button>
+        >{hasMore ? <Trans i18nKey='admin.loadMoreUsers'/> : <Trans i18nKey='admin.noMoreUsers'/>}</Button>
       </Box>
     </Container>
   );

@@ -5,7 +5,6 @@ import '@fontsource/roboto/700.css';
 
 import CssBaseline from '@mui/material/CssBaseline';
 import {ThemeProvider} from '@mui/material/styles';
-import theme from './ui/theme';
 
 import React from 'react';
 import ReactDOM from 'react-dom';
@@ -13,6 +12,8 @@ import {BrowserRouter as Router} from 'react-router-dom';
 
 import Application from './ui/application';
 import Config from './services/config';
+import theme from './ui/theme';
+import './ui/i18n';
 
 const appConfig = new Config();
 

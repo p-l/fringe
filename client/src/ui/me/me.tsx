@@ -1,8 +1,10 @@
+import {differenceInDays} from 'date-fns';
 import React from 'react';
 import {AccessTimeFilled, LockRounded, PasswordRounded} from '@mui/icons-material';
 import {Alert, Avatar, Box, Button, CircularProgress, Container, Dialog, DialogActions, DialogContent, DialogTitle, List, ListItem, ListItemIcon, ListItemText, Paper, Snackbar, Typography} from '@mui/material';
-import PasswordField from '../@components/password-field';
+import {Trans, useTranslation} from 'react-i18next';
 
+import PasswordField from '../@components/password-field';
 import useMountEffect from '../@hooks/use-mount';
 import {User} from '../../models/user';
 import {useUserService} from '../../services/user/user-service';
@@ -17,6 +19,7 @@ function Me() {
   const [passwordState, setPasswordState] = React.useState<PasswordState>(PasswordState.NoPassword);
   const [errorMessage, setErrorMessage] = React.useState<string>('');
   const [warningModalOpen, setWarningModalOpen] = React.useState(false);
+  const {t} = useTranslation();
 
   const openWarningModal = () => setWarningModalOpen(true);
   const cancelWarningModal = () => setWarningModalOpen(false);
@@ -27,7 +30,7 @@ function Me() {
         setPasswordState(PasswordState.HavePassword);
       } else {
         setPasswordState(PasswordState.NoPassword);
-        setErrorMessage('Could not retrieve new password from server');
+        setErrorMessage(t('me.errorFailedToGetPassword'));
       }
     });
   };
@@ -50,21 +53,19 @@ function Me() {
   return (
     <Container component="main" maxWidth="sm">
       {/* Error Message */}
-      <Snackbar autoHideDuration={4000} open={errorMessage.length > 0} onClose={()=> setErrorMessage('')}>
-        <Alert severity="error" sx={{width: '100%'}}>{errorMessage}</Alert>
+      <Snackbar anchorOrigin={{vertical: 'bottom', horizontal: 'center'}} autoHideDuration={4000} open={errorMessage.length > 0} onClose={()=> setErrorMessage('')}>
+        <Alert variant='filled' severity="error" sx={{width: '100%'}}>{errorMessage}</Alert>
       </Snackbar>
       {/* Confirmation Dialog */}
       <Dialog open={warningModalOpen}>
-        <DialogTitle>Replacing Password</DialogTitle>
-        <DialogContent>
-          Creating a new password will remove the previous password. Only one password can exist at a time.
-        </DialogContent>
+        <DialogTitle><Trans i18nKey='me.renewDialogTitle' /></DialogTitle>
+        <DialogContent><Trans i18nKey='me.renewDialogInstruction' /></DialogContent>
         <DialogActions>
-          <Button onClick={cancelWarningModal}>Cancel</Button>
-          <Button onClick={confirmWarningModal} color="error">Understood</Button>
+          <Button onClick={cancelWarningModal}><Trans i18nKey='actions.cancel' /></Button>
+          <Button onClick={confirmWarningModal} color="error"><Trans i18nKey='actions.understood' /></Button>
         </DialogActions>
       </Dialog>
-
+      {/* User profile */}
       <Box sx={{marginTop: 5, display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
         <Avatar
           sx={{bgcolor: theme.palette.primary.main, width: 96, height: 96}}
@@ -77,25 +78,28 @@ function Me() {
       </Box>
       <Paper variant="outlined" sx={{marginTop: 4}}>
         <List>
+          {/* Last Seen */}
           <ListItem>
             <ListItemIcon>
               <AccessTimeFilled />
             </ListItemIcon>
             <ListItemText
-              primary="Last Seen"
-              secondary={currentUser == null ? `...` : currentUser.lastSeen()}
+              primary={t('me.lastSeen')}
+              secondary={currentUser == null ? `...` : t('me.lastSeenDate', {lastSeenDate: currentUser.lastSeenAt, formatParams: {lastSeenDate: {weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: false, timeZoneName: 'short'}}})}
             />
           </ListItem>
+          {/* Password Age */}
           <ListItem >
             <ListItemIcon>
               <LockRounded />
             </ListItemIcon>
             <ListItemText
-              primary="Password Age"
-              secondary={currentUser == null ? `...` : `${currentUser.passwordAgeInDays()} day old`}
+              primary={t('me.passwordAge')}
+              secondary={currentUser == null ? `...` : t('me.passwordAgeRelative', {count: differenceInDays(currentUser.passwordUpdatedAt, Date.now()), passwordAge: differenceInDays(currentUser.passwordUpdatedAt, Date.now())})}
             />
           </ListItem>
         </List>
+        {/* Password */}
         <Box sx={{p: 2, display: 'flex', flexDirection: 'column', alignItems: 'right'}}>
           { passwordState != PasswordState.HavePassword && (
             <Button
@@ -103,7 +107,7 @@ function Me() {
               variant="contained"
               startIcon={ passwordState == PasswordState.FetchingPassword ? <CircularProgress size={16} />: <PasswordRounded />}
               disabled={passwordState != PasswordState.NoPassword}>
-            New Password
+              <Trans i18nKey='me.newPassword' />
             </Button>
           )}
           { passwordState == PasswordState.HavePassword && (
