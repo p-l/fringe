@@ -204,7 +204,7 @@ describe('AuthService', () => {
       expect(response).not.toBeNull();
       expect(response.data).not.toBeNull();
       expect(response.data.requestHeaders).not.toBeNull();
-      expect(response.data.requestHeaders['Authorization']).toBeNull();
+      expect(response.data.requestHeaders['Authorization']).toBeUndefined();
     }).catch((error) => {
       console.error(error);
     });

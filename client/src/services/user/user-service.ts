@@ -92,10 +92,14 @@ class UserService {
       let result : string = 'failed';
 
       if (response.data && 'result' in response.data) {
-        result = response.data['result'];
-        if (result == 'success' && 'user' in response.data) {
+        if (response.data['result'] == 'success' && 'user' in response.data) {
           const userData = response.data['user'];
           user = UserService.createUserFromResponseData(userData);
+          if (user != null) {
+            result = response.data['result'];
+          }
+        } else {
+          result = response.data['result'];
         }
       }
 
@@ -109,7 +113,7 @@ class UserService {
   delete(email: string, callback: (resultText: string)=>void) {
     const deleteURL = `${this.userApiURL()}${encodeURIComponent(email)}/`;
     axios.delete(deleteURL).then((response) => {
-      let result : string = 'failed';
+      let result = 'failed';
       if (response.data && 'result' in response.data) {
         result = response.data['result'];
       }

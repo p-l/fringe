@@ -74,7 +74,7 @@ describe('UserService', () => {
       'picture': 'https://picture.url',
       'password_updated_at': 0,
       'last_seen_at': 0,
-    }, null); // missing email field
+    }, null);
 
     userService.me((user) => {
       expect(user).not.toBeNull();
@@ -92,7 +92,7 @@ describe('UserService', () => {
       'password_updated_at': 0,
       'last_seen_at': 0,
       'password': 'super_secret',
-    }, null); // missing email field
+    }, null);
 
     userService.me((user) => {
       expect(user).not.toBeNull();
@@ -132,7 +132,7 @@ describe('UserService', () => {
       'password_updated_at': 0,
       'last_seen_at': 0,
       'password': '',
-    }, null); // missing email field
+    }, null);
 
     userService.renewMyPassword((user) => {
       expect(user).toBeNull();
@@ -147,7 +147,7 @@ describe('UserService', () => {
       'picture': 'https://picture.url',
       'password_updated_at': 0,
       'last_seen_at': 0,
-    }, null); // missing email field
+    }, null);
 
     userService.renewMyPassword((user) => {
       expect(user).toBeNull();
@@ -163,11 +163,134 @@ describe('UserService', () => {
       'password_updated_at': 0,
       'last_seen_at': 0,
       'password': 'super_random_password',
-    }, null); // missing email field
+    }, null);
 
     userService.renewMyPassword((user) => {
       expect(user).not.toBeNull();
       expect(user?.password).toEqual('super_random_password');
+    });
+  });
+
+  it('returns a list of user model', async () => {
+    const userService = new UserService();
+    mock.onGet(userService.userApiURL()).reply(200, [{
+      'email': 'some@email.com',
+      'name': 'some user',
+      'picture': 'https://picture.url',
+      'password_updated_at': 0,
+      'last_seen_at': 0,
+      'password': 'super_random_password',
+    }], null);
+
+    userService.findAllUsers('', 0, 20, (users, success) => {
+      expect(success).toBeTruthy();
+      expect(users).not.toBeNull();
+      expect(users.length).toBe(1);
+      expect(users[0].email).toEqual('some@email.com');
+    });
+  });
+
+  it('catches error and return failure', async () => {
+    const userService = new UserService();
+    mock.onGet(userService.userApiURL()).reply(500, null, null); // missing email field
+
+    userService.findAllUsers('', 0, 20, (users, success) => {
+      expect(success).not.toBeTruthy();
+      expect(users).not.toBeNull();
+      expect(users.length).toBe(0);
+    });
+  });
+
+  it('returns a valid user when creating', async () => {
+    const userService = new UserService();
+    mock.onPost(userService.userApiURL()).reply(200, {
+      result: 'success',
+      user: {
+        'email': 'some@email.com',
+        'name': 'some user',
+        'picture': 'https://picture.url',
+        'password_updated_at': 0,
+        'last_seen_at': 0,
+        'password': 'super_random_password',
+      }}, null);
+
+    userService.create('some@email.com', 'some user', (resultText, user) => {
+      expect(resultText).toEqual('success');
+      expect(user).not.toBeNull();
+      expect(user?.email).toEqual('some@email.com');
+    });
+  });
+
+  it('returns a failure when receiving an invalid user', async () => {
+    const userService = new UserService();
+    mock.onPost(userService.userApiURL()).reply(200, {
+      result: 'success',
+      user: {
+        'name': 'some user',
+        'picture': 'https://picture.url',
+        'password_updated_at': 0,
+        'last_seen_at': 0,
+        'password': 'super_random_password',
+      }}, null); // no email for user
+
+    userService.create('some@email.com', 'some user', (resultText, user) => {
+      expect(resultText).toEqual('failed');
+      expect(user).toBeNull();
+    });
+  });
+
+  it('returns a failure when service returns an failure', async () => {
+    const userService = new UserService();
+    mock.onPost(userService.userApiURL()).reply(200, {
+      result: 'exists',
+      user: null,
+    }, null);
+
+    userService.create('some@email.com', 'some user', (resultText, user) => {
+      expect(resultText).toEqual('exists');
+      expect(user).toBeNull();
+    });
+  });
+
+  it('returns a failure when service returns an error ', async () => {
+    const userService = new UserService();
+    mock.onPost(userService.userApiURL()).reply(500, null, null);
+
+    userService.create('some@email.com', 'some user', (resultText, user) => {
+      expect(resultText).toEqual('failed');
+      expect(user).toBeNull();
+    });
+  });
+
+  it('return success with no user when delete succeed', async () => {
+    const userService = new UserService();
+    mock.onDelete(userService.userApiURL()+'some%40email.com/').reply(200, {
+      result: 'success',
+      user: null,
+    }, null);
+
+    userService.delete('some@email.com', (resultText) => {
+      expect(resultText).toEqual('success');
+    });
+  });
+
+  it('return failed on invalid response data', async () => {
+    const userService = new UserService();
+    mock.onDelete(userService.userApiURL()+'some%40email.com/').reply(200, {
+      user: null,
+    }, null);
+
+    userService.delete('some@email.com', (resultText) => {
+      expect(resultText).toEqual('failed');
+    });
+  });
+
+  it('return failed on error code', async () => {
+    const userService = new UserService();
+    mock.onDelete(userService.userApiURL()+'some%40email.com/').reply(500, null, null);
+
+    userService.delete('some@email.com', (resultText) => {
+      expect(resultText).toEqual('failed');
     });
   });
 });
