@@ -12,8 +12,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-const googleTokenAPIURL = "https://oauth2.googleapis.com/token"
-
 func TestGoogleOAuthService_AuthenticateUserWithCode(t *testing.T) {
 	t.Parallel()
 
@@ -39,21 +37,29 @@ func TestGoogleOAuthService_AuthenticateUserWithCode(t *testing.T) {
 		t.Parallel()
 
 		client := mocks.NewMockHTTPClient(func(req *http.Request) *http.Response {
-			url := req.URL.String()
-			switch url {
-			case googleTokenAPIURL:
-				return &http.Response{
-					StatusCode: http.StatusOK,
-					Body:       ioutil.NopCloser(bytes.NewBufferString(`{ "access_token": "an_access_token", "expires_in": 42, "scope": "a_scope", "token_type": "bearer_test", "id_token": "an_id_token" }`)),
-					Header:     make(http.Header),
-				}
+			return &http.Response{
+				StatusCode: http.StatusTeapot,
+				Body:       ioutil.NopCloser(bytes.NewBufferString(`{}`)),
+				Header:     make(http.Header),
+			}
+		})
 
-			default:
-				return &http.Response{
-					StatusCode: http.StatusTeapot,
-					Body:       ioutil.NopCloser(bytes.NewBufferString(`{}`)),
-					Header:     make(http.Header),
-				}
+		service := services.NewGoogleOAuthService(client, "client_id", "client_secret", "https://redirect.url/somewhere/callback")
+		googleUser, err := service.AuthenticateUserWithToken(context.Background(), "bearer", "code")
+		assert.Error(t, err)
+		assert.ErrorIs(t, err, services.ErrGoogleAuthenticationFailed)
+		assert.Nil(t, googleUser)
+	})
+
+	t.Run("Refuses authentication on empty user info", func(t *testing.T) {
+		t.Parallel()
+
+		client := mocks.NewMockHTTPClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body: ioutil.NopCloser(
+					bytes.NewBufferString(`{ "sub": "a_sub", "picture": "https://profile/picture/url", "hd": "domain.com" }`)),
+				Header: make(http.Header),
 			}
 		})
 
@@ -68,21 +74,29 @@ func TestGoogleOAuthService_AuthenticateUserWithCode(t *testing.T) {
 		t.Parallel()
 
 		client := mocks.NewMockHTTPClient(func(req *http.Request) *http.Response {
-			url := req.URL.String()
-			switch url {
-			case googleTokenAPIURL:
-				return &http.Response{
-					StatusCode: http.StatusOK,
-					Body:       ioutil.NopCloser(bytes.NewBufferString(`{ "access_token": "an_access_token", "expires_in": 42, "scope": "a_scope", "token_type": "bearer_test", "id_token": "an_id_token" }`)),
-					Header:     make(http.Header),
-				}
-			default:
-				return &http.Response{
-					StatusCode: http.StatusOK,
-					Body: ioutil.NopCloser(
-						bytes.NewBufferString(`{ "sub": "a_sub", "picture": "https://profile/picture/url", "hd": "domain.com" }`)),
-					Header: make(http.Header),
-				}
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body: ioutil.NopCloser(
+					bytes.NewBufferString(`INVALID RESPONSE`)),
+				Header: make(http.Header),
+			}
+		})
+
+		service := services.NewGoogleOAuthService(client, "client_id", "client_secret", "https://redirect.url/somewhere/callback")
+		googleUser, err := service.AuthenticateUserWithToken(context.Background(), "bearer", "code")
+		assert.Error(t, err)
+		assert.ErrorIs(t, err, services.ErrGoogleAuthenticationFailed)
+		assert.Nil(t, googleUser)
+	})
+
+	t.Run("Refuses authentication absent response", func(t *testing.T) {
+		t.Parallel()
+
+		client := mocks.NewMockHTTPClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       nil,
+				Header:     make(http.Header),
 			}
 		})
 
@@ -97,21 +111,11 @@ func TestGoogleOAuthService_AuthenticateUserWithCode(t *testing.T) {
 		t.Parallel()
 
 		client := mocks.NewMockHTTPClient(func(req *http.Request) *http.Response {
-			url := req.URL.String()
-			switch url {
-			case googleTokenAPIURL:
-				return &http.Response{
-					StatusCode: http.StatusOK,
-					Body:       ioutil.NopCloser(bytes.NewBufferString(`{ "access_token": "an_access_token", "expires_in": 42, "scope": "a_scope", "token_type": "bearer_test", "id_token": "an_id_token" }`)),
-					Header:     make(http.Header),
-				}
-			default:
-				return &http.Response{
-					StatusCode: http.StatusOK,
-					Body: ioutil.NopCloser(bytes.NewBufferString(
-						`{ "sub": "a_sub", "email": "email@domain.com", "email_verified": true, "picture": "https://profile/picture/url", "hd": "domain.com" }`)),
-					Header: make(http.Header),
-				}
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body: ioutil.NopCloser(bytes.NewBufferString(
+					`{ "sub": "a_sub", "email": "email@domain.com", "email_verified": true, "picture": "https://profile/picture/url", "hd": "domain.com" }`)),
+				Header: make(http.Header),
 			}
 		})
 
