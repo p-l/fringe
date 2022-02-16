@@ -93,7 +93,6 @@ func TestAuthHandler_Login(t *testing.T) {
 		router.HandleFunc("/auth/", authHandler.Login)
 		router.ServeHTTP(res, req)
 
-		// Redirect to protected resource
 		assert.Equal(t, http.StatusOK, res.Result().StatusCode)
 
 		// includes bearer token in response
@@ -103,5 +102,68 @@ func TestAuthHandler_Login(t *testing.T) {
 
 		assert.NotEmpty(t, response.Token)
 		assert.Equal(t, response.TokenType, "Bearer")
+	})
+
+	t.Run("Returns error on invalid post data", func(t *testing.T) {
+		t.Parallel()
+
+		client := mocks.NewMockHTTPClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       nil,
+				Header:     make(http.Header),
+			}
+		})
+
+		googleOAuth := services.NewGoogleOAuthService(client, "id", "secret", "callback")
+		authHelper := helpers.NewAuthHelper("test.com", "secret", []string{})
+		userRepo := mocks.NewMockUserRepository(t)
+		authHandler := handlers.NewAuthHandler(userRepo, googleOAuth, authHelper)
+
+		req := httptest.NewRequest(http.MethodPost, "/auth/", nil)
+		req.Header.Set("Content-Type", "application/json")
+
+		res := httptest.NewRecorder()
+
+		router := mux.NewRouter()
+		router.HandleFunc("/auth/", authHandler.Login)
+		router.ServeHTTP(res, req)
+
+		assert.Equal(t, http.StatusUnauthorized, res.Result().StatusCode)
+	})
+
+	t.Run("Returns error on refused Google user info", func(t *testing.T) {
+		t.Parallel()
+
+		client := mocks.NewMockHTTPClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: http.StatusUnauthorized,
+				Body:       nil,
+				Header:     make(http.Header),
+			}
+		})
+
+		googleOAuth := services.NewGoogleOAuthService(client, "id", "secret", "callback")
+		authHelper := helpers.NewAuthHelper("test.com", "secret", []string{})
+		userRepo := mocks.NewMockUserRepository(t)
+		authHandler := handlers.NewAuthHandler(userRepo, googleOAuth, authHelper)
+
+		loginRequest := handlers.LoginRequest{
+			AccessToken: "invalid_test_token",
+			TokenType:   "token_type",
+		}
+		jsonBytes, err := json.Marshal(loginRequest)
+		assert.NoError(t, err)
+
+		req := httptest.NewRequest(http.MethodPost, "/auth/", bytes.NewBuffer(jsonBytes))
+		req.Header.Set("Content-Type", "application/json")
+
+		res := httptest.NewRecorder()
+
+		router := mux.NewRouter()
+		router.HandleFunc("/auth/", authHandler.Login)
+		router.ServeHTTP(res, req)
+
+		assert.Equal(t, http.StatusUnauthorized, res.Result().StatusCode)
 	})
 }

@@ -16,6 +16,11 @@ type AuthHelper struct {
 
 var ErrInvalidClaimsToken = errors.New("invalid claims token")
 
+const (
+	AdminRoleString = "admin"
+	UserRoleString  = "user"
+)
+
 func NewAuthHelper(allowedDomain string, secret string, adminsEmail []string) *AuthHelper {
 	return &AuthHelper{
 		secret:        secret,
@@ -60,9 +65,9 @@ func (h *AuthHelper) InAllowedDomain(email string) bool {
 func (h *AuthHelper) RoleForEmail(email string) string {
 	for _, adminEmail := range h.admins {
 		if strings.EqualFold(adminEmail, email) {
-			return "admin"
+			return AdminRoleString
 		}
 	}
 
-	return "user"
+	return UserRoleString
 }

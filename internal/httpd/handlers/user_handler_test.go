@@ -1,9 +1,12 @@
 package handlers_test
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	"github.com/gorilla/mux"
@@ -70,8 +73,8 @@ func TestUserHandler_List(t *testing.T) {
 			Permissions: "",
 		}
 
-		req := httptest.NewRequest(http.MethodGet, "/user/", nil)
-		res := makeRequestToHandlerWithClaims(&claims, "/user/", userHandler.List, req)
+		req := httptest.NewRequest(http.MethodGet, "/users/", nil)
+		res := makeRequestToHandlerWithClaims(&claims, "/users/", userHandler.List, req)
 
 		assert.Equal(t, http.StatusUnauthorized, res.Result().StatusCode)
 	})
@@ -85,54 +88,111 @@ func TestUserHandler_List(t *testing.T) {
 			Permissions: "admin",
 		}
 
-		req := httptest.NewRequest(http.MethodGet, "/user/", nil)
-		res := makeRequestToHandlerWithClaims(&claims, "/user/", userHandler.List, req)
+		req := httptest.NewRequest(http.MethodGet, "/users/", nil)
+		res := makeRequestToHandlerWithClaims(&claims, "/users/", userHandler.List, req)
 
 		assert.Equal(t, http.StatusOK, res.Result().StatusCode)
 	})
-}
 
-func TestUserHandler_Delete(t *testing.T) {
-	t.Parallel()
-	t.Run("Return unauthorized if not admin", func(t *testing.T) {
+	t.Run("Defaults to page 0 if argument is not a number", func(t *testing.T) {
 		t.Parallel()
 
 		userHandler, _ := createUserHandler(t)
-		claims := helpers.AuthClaims{
-			Email:       regularUserEmail,
-			Permissions: "",
-		}
-
-		req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/user/%s", regularUserEmail), nil)
-		res := makeRequestToHandlerWithClaims(&claims, "/user/{email}", userHandler.Delete, req)
-
-		assert.Equal(t, http.StatusUnauthorized, res.Result().StatusCode)
-	})
-
-	t.Run("Return OK for admin users", func(t *testing.T) {
-		t.Parallel()
-
-		userHandler, userRepo := createUserHandler(t)
 		claims := helpers.AuthClaims{
 			Email:       adminEmail,
 			Permissions: "admin",
 		}
 
-		// User is in the DB
-		user, err := userRepo.FindByEmail(regularUserEmail)
+		req := httptest.NewRequest(http.MethodGet, "/users/?page=rabbit", nil)
+		res := makeRequestToHandlerWithClaims(&claims, "/users/", userHandler.List, req)
+
+		assert.Equal(t, http.StatusOK, res.Result().StatusCode)
+
+		var usersInResponse []handlers.UserResponse
+		err := json.Unmarshal(res.Body.Bytes(), &usersInResponse)
 		assert.NoError(t, err)
-		assert.Equal(t, regularUserEmail, user.Email)
+		assert.NotEmpty(t, usersInResponse)
+	})
 
-		// Delete
-		req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/user/%s", regularUserEmail), nil)
-		res := makeRequestToHandlerWithClaims(&claims, "/user/{email}", userHandler.Delete, req)
+	t.Run("Defaults to 10 per_page if argument is not a number", func(t *testing.T) {
+		t.Parallel()
+
+		userHandler, _ := createUserHandler(t)
+		claims := helpers.AuthClaims{
+			Email:       adminEmail,
+			Permissions: "admin",
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/users/?per_page=rabbit", nil)
+		res := makeRequestToHandlerWithClaims(&claims, "/users/", userHandler.List, req)
 
 		assert.Equal(t, http.StatusOK, res.Result().StatusCode)
 
-		// User nolonger in database
-		user, err = userRepo.FindByEmail(regularUserEmail)
-		assert.ErrorIs(t, err, repos.ErrUserNotFound)
-		assert.Nil(t, user)
+		var usersInResponse []handlers.UserResponse
+		err := json.Unmarshal(res.Body.Bytes(), &usersInResponse)
+		assert.NoError(t, err)
+		assert.NotEmpty(t, usersInResponse)
+	})
+
+	t.Run("Return no users when asking for a page past max", func(t *testing.T) {
+		t.Parallel()
+
+		userHandler, _ := createUserHandler(t)
+		claims := helpers.AuthClaims{
+			Email:       adminEmail,
+			Permissions: "admin",
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/users/?per_page=100&page=2", nil)
+		res := makeRequestToHandlerWithClaims(&claims, "/users/", userHandler.List, req)
+
+		assert.Equal(t, http.StatusOK, res.Result().StatusCode)
+
+		var usersInResponse []handlers.UserResponse
+		err := json.Unmarshal(res.Body.Bytes(), &usersInResponse)
+		assert.NoError(t, err)
+		assert.Empty(t, usersInResponse)
+	})
+
+	t.Run("Returns only users matching a query string", func(t *testing.T) {
+		t.Parallel()
+
+		userHandler, _ := createUserHandler(t)
+		claims := helpers.AuthClaims{
+			Email:       adminEmail,
+			Permissions: "admin",
+		}
+
+		escapedAdminEmail := url.QueryEscape(adminEmail)
+		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/users/?search=%s", escapedAdminEmail), nil)
+		res := makeRequestToHandlerWithClaims(&claims, "/users/", userHandler.List, req)
+
+		assert.Equal(t, http.StatusOK, res.Result().StatusCode)
+
+		var usersInResponse []handlers.UserResponse
+		err := json.Unmarshal(res.Body.Bytes(), &usersInResponse)
+		assert.NoError(t, err)
+		assert.Len(t, usersInResponse, 1)
+	})
+
+	t.Run("Returns no users when nothing matches search string", func(t *testing.T) {
+		t.Parallel()
+
+		userHandler, _ := createUserHandler(t)
+		claims := helpers.AuthClaims{
+			Email:       adminEmail,
+			Permissions: "admin",
+		}
+
+		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/users/?search=%s", "ThereAreNoUserMatchingThisString"), nil)
+		res := makeRequestToHandlerWithClaims(&claims, "/users/", userHandler.List, req)
+
+		assert.Equal(t, http.StatusOK, res.Result().StatusCode)
+
+		var usersInResponse []handlers.UserResponse
+		err := json.Unmarshal(res.Body.Bytes(), &usersInResponse)
+		assert.NoError(t, err)
+		assert.Empty(t, usersInResponse)
 	})
 }
 
@@ -155,7 +215,23 @@ func TestUserHandler_View(t *testing.T) {
 		assert.Equal(t, http.StatusOK, res.Result().StatusCode)
 	})
 
-	t.Run("User can view self", func(t *testing.T) {
+	t.Run("Admin get 404 on unknown user query", func(t *testing.T) {
+		t.Parallel()
+
+		userHandler, _ := createUserHandler(t)
+		claims := helpers.AuthClaims{
+			Email:       adminEmail,
+			Permissions: "admin",
+		}
+
+		// View
+		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/user/%s/", "unknown@unknown.unknown"), nil)
+		res := makeRequestToHandlerWithClaims(&claims, "/user/{email}/", userHandler.View, req)
+
+		assert.Equal(t, http.StatusNotFound, res.Result().StatusCode)
+	})
+
+	t.Run("User can view self with email", func(t *testing.T) {
 		t.Parallel()
 
 		userHandler, _ := createUserHandler(t)
@@ -165,8 +241,48 @@ func TestUserHandler_View(t *testing.T) {
 		}
 
 		// View
-		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/user/%s/", regularUserEmail), nil)
-		res := makeRequestToHandlerWithClaims(&claims, "/user/{email}/", userHandler.View, req)
+		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/users/%s/", regularUserEmail), nil)
+		res := makeRequestToHandlerWithClaims(&claims, "/users/{email}/", userHandler.View, req)
+
+		assert.Equal(t, http.StatusOK, res.Result().StatusCode)
+	})
+
+	t.Run("User can view self with 'me' as email", func(t *testing.T) {
+		t.Parallel()
+
+		userHandler, _ := createUserHandler(t)
+		claims := helpers.AuthClaims{
+			Email:       regularUserEmail,
+			Permissions: "",
+		}
+
+		// View
+		req := httptest.NewRequest(http.MethodGet, "/users/me/", nil)
+		res := makeRequestToHandlerWithClaims(&claims, "/users/{email}/", userHandler.View, req)
+
+		assert.Equal(t, http.StatusOK, res.Result().StatusCode)
+
+		var user handlers.UserResponse
+		err := json.Unmarshal(res.Body.Bytes(), &user)
+		assert.NoError(t, err)
+		assert.Empty(t, user.Password)
+		assert.Equal(t, user.Email, claims.Email)
+	})
+
+	t.Run("User enroll when first querying their info", func(t *testing.T) {
+		t.Parallel()
+
+		userHandler, _ := createUserHandler(t)
+		claims := helpers.AuthClaims{
+			Email:       "new-user@newuser.com",
+			Name:        "New User",
+			Permissions: "",
+			Picture:     "",
+		}
+
+		// View
+		req := httptest.NewRequest(http.MethodGet, "/users/me/", nil)
+		res := makeRequestToHandlerWithClaims(&claims, "/users/{email}/", userHandler.View, req)
 
 		assert.Equal(t, http.StatusOK, res.Result().StatusCode)
 	})
@@ -230,7 +346,7 @@ func TestUserHandler_Renew(t *testing.T) {
 		assert.Equal(t, http.StatusInternalServerError, res.Result().StatusCode)
 	})
 
-	t.Run("User can enroll self", func(t *testing.T) {
+	t.Run("User can renew own password with email", func(t *testing.T) {
 		t.Parallel()
 
 		userHandler, _ := createUserHandler(t)
@@ -244,6 +360,28 @@ func TestUserHandler_Renew(t *testing.T) {
 		res := makeRequestToHandlerWithClaims(&claims, "/user/{email}/renew", userHandler.Renew, req)
 
 		assert.Equal(t, http.StatusOK, res.Result().StatusCode)
+	})
+
+	t.Run("User can renew own password with 'me' as email", func(t *testing.T) {
+		t.Parallel()
+
+		userHandler, _ := createUserHandler(t)
+		claims := helpers.AuthClaims{
+			Email:       regularUserEmail,
+			Permissions: "",
+		}
+
+		// Renew
+		req := httptest.NewRequest(http.MethodGet, "/user/me/renew", nil)
+		res := makeRequestToHandlerWithClaims(&claims, "/user/{email}/renew", userHandler.Renew, req)
+
+		assert.Equal(t, http.StatusOK, res.Result().StatusCode)
+
+		var user handlers.UserResponse
+		err := json.Unmarshal(res.Body.Bytes(), &user)
+		assert.NoError(t, err)
+		assert.NotEmpty(t, user.Password)
+		assert.Equal(t, user.Email, claims.Email)
 	})
 
 	t.Run("Regular user cannot enroll other users", func(t *testing.T) {
@@ -260,5 +398,267 @@ func TestUserHandler_Renew(t *testing.T) {
 		res := makeRequestToHandlerWithClaims(&claims, "/user/{email}/renew", userHandler.Renew, req)
 
 		assert.Equal(t, http.StatusForbidden, res.Result().StatusCode)
+	})
+}
+
+func TestUserHandler_Delete(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Return unauthorized if not admin", func(t *testing.T) {
+		t.Parallel()
+
+		userHandler, _ := createUserHandler(t)
+		claims := helpers.AuthClaims{
+			Email:       regularUserEmail,
+			Permissions: "",
+		}
+
+		req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/user/%s", regularUserEmail), nil)
+		res := makeRequestToHandlerWithClaims(&claims, "/user/{email}", userHandler.Delete, req)
+
+		assert.Equal(t, http.StatusUnauthorized, res.Result().StatusCode)
+	})
+
+	t.Run("Return OK for admin users", func(t *testing.T) {
+		t.Parallel()
+
+		userHandler, userRepo := createUserHandler(t)
+		claims := helpers.AuthClaims{
+			Email:       adminEmail,
+			Permissions: "admin",
+		}
+
+		// User is in the DB
+		user, err := userRepo.FindByEmail(regularUserEmail)
+		assert.NoError(t, err)
+		assert.Equal(t, regularUserEmail, user.Email)
+
+		// Delete
+		req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/user/%s", regularUserEmail), nil)
+		res := makeRequestToHandlerWithClaims(&claims, "/user/{email}", userHandler.Delete, req)
+
+		assert.Equal(t, http.StatusOK, res.Result().StatusCode)
+
+		// User not in database
+		user, err = userRepo.FindByEmail(regularUserEmail)
+		assert.ErrorIs(t, err, repos.ErrUserNotFound)
+		assert.Nil(t, user)
+	})
+
+	t.Run("Refuses invalid email", func(t *testing.T) {
+		t.Parallel()
+
+		userHandler, _ := createUserHandler(t)
+		claims := helpers.AuthClaims{
+			Email:       adminEmail,
+			Permissions: "admin",
+		}
+
+		// Delete
+		req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/users/%s/", "invalid@email"), nil)
+		res := makeRequestToHandlerWithClaims(&claims, "/users/{email}/", userHandler.Delete, req)
+
+		assert.Equal(t, http.StatusBadRequest, res.Result().StatusCode)
+	})
+
+	t.Run("Refuses delete on not existing email", func(t *testing.T) {
+		t.Parallel()
+
+		userHandler, _ := createUserHandler(t)
+		claims := helpers.AuthClaims{
+			Email:       adminEmail,
+			Permissions: "admin",
+		}
+
+		// Delete
+		req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/users/%s/", "i.am@not.in.database.com"), nil)
+		res := makeRequestToHandlerWithClaims(&claims, "/users/{email}/", userHandler.Delete, req)
+
+		assert.Equal(t, http.StatusOK, res.Result().StatusCode)
+
+		var response handlers.UserActionResponse
+		err := json.Unmarshal(res.Body.Bytes(), &response)
+		assert.NoError(t, err)
+
+		assert.Equal(t, response.Result, "not_found")
+		assert.Nil(t, response.User)
+	})
+}
+
+func TestUserHandler_Create(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Return unauthorized if not admin", func(t *testing.T) {
+		t.Parallel()
+
+		userHandler, _ := createUserHandler(t)
+		claims := helpers.AuthClaims{
+			Email:       regularUserEmail,
+			Permissions: "",
+		}
+
+		userData := handlers.UserCreateRequest{
+			Email: "new.user@email.com",
+			Name:  "New User",
+		}
+		jsonBytes, err := json.Marshal(userData)
+		assert.NoError(t, err)
+
+		req := httptest.NewRequest(http.MethodPost, "/users/", bytes.NewBuffer(jsonBytes))
+		res := makeRequestToHandlerWithClaims(&claims, "/users/", userHandler.Create, req)
+
+		assert.Equal(t, http.StatusUnauthorized, res.Result().StatusCode)
+	})
+
+	t.Run("Return invalid request on absent data", func(t *testing.T) {
+		t.Parallel()
+
+		userHandler, _ := createUserHandler(t)
+		claims := helpers.AuthClaims{
+			Email:       adminEmail,
+			Permissions: "admin",
+		}
+
+		req := httptest.NewRequest(http.MethodPost, "/users/", nil)
+		res := makeRequestToHandlerWithClaims(&claims, "/users/", userHandler.Create, req)
+
+		assert.Equal(t, http.StatusBadRequest, res.Result().StatusCode)
+	})
+
+	t.Run("Refuses when user outside of allowed domain", func(t *testing.T) {
+		t.Parallel()
+
+		userHandler, userRepo := createUserHandler(t)
+		claims := helpers.AuthClaims{
+			Email:       adminEmail,
+			Permissions: "admin",
+		}
+
+		userData := handlers.UserCreateRequest{
+			Email: "new.user@not-in-test.com",
+			Name:  "New User",
+		}
+		jsonBytes, err := json.Marshal(userData)
+		assert.NoError(t, err)
+
+		req := httptest.NewRequest(http.MethodPost, "/users/", bytes.NewBuffer(jsonBytes))
+		res := makeRequestToHandlerWithClaims(&claims, "/users/", userHandler.Create, req)
+
+		// User is NOT in database
+		user, err := userRepo.FindByEmail(userData.Email)
+		assert.Error(t, err, repos.ErrUserNotFound)
+		assert.Nil(t, user)
+
+		// Refuses request
+		assert.Equal(t, http.StatusBadRequest, res.Result().StatusCode)
+	})
+
+	t.Run("Refuses malformed emails", func(t *testing.T) {
+		t.Parallel()
+
+		userHandler, userRepo := createUserHandler(t)
+		claims := helpers.AuthClaims{
+			Email:       adminEmail,
+			Permissions: "admin",
+		}
+
+		userData := handlers.UserCreateRequest{
+			Email: "new.user@not-a-valid-email",
+			Name:  "New User",
+		}
+		jsonBytes, err := json.Marshal(userData)
+		assert.NoError(t, err)
+
+		req := httptest.NewRequest(http.MethodPost, "/users/", bytes.NewBuffer(jsonBytes))
+		res := makeRequestToHandlerWithClaims(&claims, "/users/", userHandler.Create, req)
+
+		// User is NOT in database
+		user, err := userRepo.FindByEmail(userData.Email)
+		assert.Error(t, err, repos.ErrUserNotFound)
+		assert.Nil(t, user)
+
+		// Refuses request
+		assert.Equal(t, http.StatusBadRequest, res.Result().StatusCode)
+	})
+
+	t.Run("Refuses creating existing users", func(t *testing.T) {
+		t.Parallel()
+
+		userHandler, userRepo := createUserHandler(t)
+		claims := helpers.AuthClaims{
+			Email:       adminEmail,
+			Permissions: "admin",
+		}
+
+		userData := handlers.UserCreateRequest{
+			Email: regularUserEmail,
+			Name:  "New User",
+		}
+		jsonBytes, err := json.Marshal(userData)
+		assert.NoError(t, err)
+
+		req := httptest.NewRequest(http.MethodPost, "/users/", bytes.NewBuffer(jsonBytes))
+		res := makeRequestToHandlerWithClaims(&claims, "/users/", userHandler.Create, req)
+
+		// User is in database
+		user, err := userRepo.FindByEmail(userData.Email)
+		assert.NoError(t, err)
+		assert.NotNil(t, user)
+		assert.Equal(t, user.Email, userData.Email)
+
+		// Refuses request
+		assert.Equal(t, http.StatusOK, res.Result().StatusCode)
+
+		var response handlers.UserActionResponse
+		err = json.Unmarshal(res.Body.Bytes(), &response)
+		assert.NoError(t, err)
+
+		assert.Equal(t, response.Result, "exists")
+		assert.Nil(t, response.User)
+	})
+
+	t.Run("Return OK for admin users", func(t *testing.T) {
+		t.Parallel()
+
+		userHandler, userRepo := createUserHandler(t)
+		claims := helpers.AuthClaims{
+			Email:       adminEmail,
+			Permissions: "admin",
+		}
+
+		userData := handlers.UserCreateRequest{
+			Email: "new.user@test.com",
+			Name:  "New User",
+		}
+		jsonBytes, err := json.Marshal(userData)
+		assert.NoError(t, err)
+
+		req := httptest.NewRequest(http.MethodPost, "/users/", bytes.NewBuffer(jsonBytes))
+		res := makeRequestToHandlerWithClaims(&claims, "/users/", userHandler.Create, req)
+
+		// User is in database
+		user, err := userRepo.FindByEmail(userData.Email)
+		assert.NoError(t, err)
+		assert.NotNil(t, user)
+		assert.Equal(t, user.Email, userData.Email)
+		assert.Equal(t, user.Name, userData.Name)
+		assert.NotEmpty(t, user.PasswordHash)
+
+		// Valid response
+		assert.Equal(t, http.StatusOK, res.Result().StatusCode)
+
+		var response handlers.UserActionResponse
+		err = json.Unmarshal(res.Body.Bytes(), &response)
+		assert.NoError(t, err)
+
+		assert.Equal(t, response.Result, "success")
+		assert.NotNil(t, response.User)
+		assert.Equal(t, response.User.Email, userData.Email)
+		assert.Equal(t, response.User.Name, userData.Name)
+		assert.NotEmpty(t, response.User.Password)
+	})
+
+	t.Run("", func(t *testing.T) {
+		t.Parallel()
 	})
 }

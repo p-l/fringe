@@ -18,6 +18,21 @@ type AuthMiddleware struct {
 	ProtectedPaths []string
 }
 
+var errInvalidAuthorizationString = errors.New("authorization string is invalid")
+
+func extractBearerTokenFromAuthorization(authorization string) (token string, err error) {
+	if !strings.HasPrefix(authorization, "Bearer ") {
+		return "", errInvalidAuthorizationString
+	}
+
+	splitAuthorization := strings.Split(authorization, "Bearer ")
+	if len(splitAuthorization) <= 1 {
+		return "", errInvalidAuthorizationString
+	}
+
+	return splitAuthorization[1], nil
+}
+
 func NewAuthMiddleware(redirectToAuthPath string, protectedPaths []string, excludedPaths []string, authHelper *helpers.AuthHelper) *AuthMiddleware {
 	return &AuthMiddleware{
 		authHelper:     authHelper,
@@ -82,19 +97,4 @@ func (a *AuthMiddleware) EnsureAuth(next http.Handler) http.Handler {
 		// Call the next handlers, which can be another middlewares in the chain, or the final handlers.
 		next.ServeHTTP(httpResponse, httpRequest.WithContext(ctx))
 	})
-}
-
-var errInvalidAuthorizationString = errors.New("authorization string is invalid")
-
-func extractBearerTokenFromAuthorization(authorization string) (token string, err error) {
-	if !strings.HasPrefix(authorization, "Bearer ") {
-		return "", errInvalidAuthorizationString
-	}
-
-	splitAuthorization := strings.Split(authorization, "Bearer ")
-	if len(splitAuthorization) <= 1 {
-		return "", errInvalidAuthorizationString
-	}
-
-	return splitAuthorization[1], nil
 }

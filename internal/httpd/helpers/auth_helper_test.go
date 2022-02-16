@@ -65,7 +65,7 @@ func TestAuthHelper_AuthClaimsFromSignedToken(t *testing.T) {
 		t.Parallel()
 		fake := faker.New()
 
-		authHelper := helpers.NewAuthHelper("@test.com", "secret", []string{})
+		authHelper := helpers.NewAuthHelper("test.com", "secret", []string{})
 
 		claims := helpers.NewAuthClaims(fake.Internet().Email(), fake.Person().Name(), fake.Internet().URL(), "")
 		sourceToken := authHelper.NewJWTSignedString(claims)
@@ -95,12 +95,67 @@ func TestAuthHelper_AuthClaimsFromSignedToken(t *testing.T) {
 		tokenString, err := token.SignedString(jwtKey)
 		assert.NoError(t, err)
 
-		authHelper := helpers.NewAuthHelper("@test.com", secret, []string{})
+		authHelper := helpers.NewAuthHelper("test.com", secret, []string{})
 
 		claimsFromToken, err := authHelper.AuthClaimsFromSignedToken(tokenString)
 		assert.NoError(t, err)
 		assert.NotNil(t, claimsFromToken)
 		assert.Equal(t, claims.Email, claimsFromToken.Email)
 		assert.Equal(t, claims.StandardClaims.ExpiresAt, claimsFromToken.StandardClaims.ExpiresAt)
+	})
+}
+
+func TestAuthHelper_InAllowedDomain(t *testing.T) {
+	t.Parallel()
+
+	t.Run("True on email in domain", func(t *testing.T) {
+		t.Parallel()
+
+		authHelper := helpers.NewAuthHelper("test.com", "secret", []string{})
+		assert.True(t, authHelper.InAllowedDomain("email@test.com"))
+	})
+
+	t.Run("False on email outside of domain", func(t *testing.T) {
+		t.Parallel()
+
+		authHelper := helpers.NewAuthHelper("test.com", "secret", []string{})
+		assert.False(t, authHelper.InAllowedDomain("email@not-test.com"))
+	})
+
+	t.Run("False on invalid emails", func(t *testing.T) {
+		t.Parallel()
+
+		authHelper := helpers.NewAuthHelper("test.com", "secret", []string{})
+		assert.False(t, authHelper.InAllowedDomain("email@not-email"))
+		assert.False(t, authHelper.InAllowedDomain("rabbit"))
+		assert.False(t, authHelper.InAllowedDomain("(ihtrei485^%#)(2!~$"))
+	})
+}
+
+func TestAuthHelper_RoleForEmail(t *testing.T) {
+	t.Parallel()
+
+	t.Run("admin for email in admin list", func(t *testing.T) {
+		t.Parallel()
+
+		authHelper := helpers.NewAuthHelper("test.com", "secret", []string{"admin@test.com"})
+		assert.Equal(t, authHelper.RoleForEmail("admin@test.com"), helpers.AdminRoleString)
+		assert.Equal(t, authHelper.RoleForEmail("ADMIN@test.com"), helpers.AdminRoleString)
+		assert.Equal(t, authHelper.RoleForEmail("admin@TEST.com"), helpers.AdminRoleString)
+	})
+
+	t.Run("user for email not in admin list", func(t *testing.T) {
+		t.Parallel()
+
+		authHelper := helpers.NewAuthHelper("test.com", "secret", []string{"admin@test.com"})
+		role := authHelper.RoleForEmail("user@test.com")
+		assert.Equal(t, role, helpers.UserRoleString)
+	})
+
+	t.Run("False on email outside of domain", func(t *testing.T) {
+		t.Parallel()
+
+		authHelper := helpers.NewAuthHelper("test.com", "secret", []string{"admin@test.com"})
+		assert.False(t, authHelper.InAllowedDomain("email@not-test.com"))
 	})
 }

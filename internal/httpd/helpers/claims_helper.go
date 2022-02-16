@@ -37,10 +37,6 @@ func NewAuthClaims(email string, name string, picture string, permissions string
 	}
 }
 
-func (c *AuthClaims) ContextWithClaims(ctx context.Context) context.Context {
-	return context.WithValue(ctx, userCtxKey, c)
-}
-
 func AuthClaimsFromContext(ctx context.Context) (*AuthClaims, bool) {
 	claims, ok := ctx.Value(userCtxKey).(*AuthClaims)
 	if !ok {
@@ -48,6 +44,10 @@ func AuthClaimsFromContext(ctx context.Context) (*AuthClaims, bool) {
 	}
 
 	return claims, ok
+}
+
+func (c *AuthClaims) ContextWithClaims(ctx context.Context) context.Context {
+	return context.WithValue(ctx, userCtxKey, c)
 }
 
 func (c *AuthClaims) Refresh() *AuthClaims {
@@ -58,5 +58,5 @@ func (c *AuthClaims) Refresh() *AuthClaims {
 }
 
 func (c *AuthClaims) IsAdmin() bool {
-	return strings.EqualFold(c.Permissions, "admin")
+	return strings.EqualFold(c.Permissions, AdminRoleString)
 }

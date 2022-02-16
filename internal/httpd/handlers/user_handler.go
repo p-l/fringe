@@ -64,10 +64,24 @@ func claimsAllowsForUserPage(claims *helpers.AuthClaims, targetEmail string) boo
 	return claims != nil && (strings.EqualFold(claims.Email, targetEmail) || claims.IsAdmin())
 }
 
-func forceHTTPNoCache(httpResponse http.ResponseWriter) {
+func renderResponseJSONResponse(httpResponse http.ResponseWriter, httpRequest *http.Request, jsonResponse []byte, jsonErr error) {
+	if jsonErr != nil {
+		log.Printf("User [src:%v] failed to encode response: %v", httpRequest.RemoteAddr, jsonErr)
+		http.Error(httpResponse, jsonErr.Error(), http.StatusInternalServerError)
+
+		return
+	}
+
+	httpResponse.Header().Set("Content-Type", "application/json")
 	httpResponse.Header().Add("Cache-Control", "no-store, no-cache, must-revalidate")
 	httpResponse.Header().Add("Pragma", "no-cache")
 	httpResponse.Header().Add("Expires", "0")
+
+	_, err := httpResponse.Write(jsonResponse)
+	if err != nil {
+		log.Printf("User [src:%v] failed to send response: %v", httpRequest.RemoteAddr, err)
+		http.Error(httpResponse, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 func renderUserResponse(httpResponse http.ResponseWriter, httpRequest *http.Request, user *repos.User, pwd string) {
@@ -80,39 +94,13 @@ func renderUserResponse(httpResponse http.ResponseWriter, httpRequest *http.Requ
 		Password:          pwd,
 	}
 
-	jsonResponse, err := json.Marshal(response)
-	if err != nil {
-		log.Printf("User [src:%v] failed to encode %s user response: %v", httpRequest.RemoteAddr, user.Email, err)
-		http.Error(httpResponse, err.Error(), http.StatusInternalServerError)
-
-		return
-	}
-
-	httpResponse.Header().Set("Content-Type", "application/json")
-
-	_, err = httpResponse.Write(jsonResponse)
-	if err != nil {
-		log.Printf("User [src:%v] failed to send response: %v", httpRequest.RemoteAddr, err)
-		http.Error(httpResponse, err.Error(), http.StatusInternalServerError)
-	}
+	jsonResponse, jsonErr := json.Marshal(response)
+	renderResponseJSONResponse(httpResponse, httpRequest, jsonResponse, jsonErr)
 }
 
 func renderActionResponse(httpResponse http.ResponseWriter, httpRequest *http.Request, response *UserActionResponse) {
-	jsonResponse, err := json.Marshal(response)
-	if err != nil {
-		log.Printf("User [src:%v] failed to encode action response: %v", httpRequest.RemoteAddr, err)
-		http.Error(httpResponse, err.Error(), http.StatusInternalServerError)
-
-		return
-	}
-
-	httpResponse.Header().Set("Content-Type", "application/json")
-
-	_, err = httpResponse.Write(jsonResponse)
-	if err != nil {
-		log.Printf("User [src:%v] failed to send response: %v", httpRequest.RemoteAddr, err)
-		http.Error(httpResponse, err.Error(), http.StatusInternalServerError)
-	}
+	jsonResponse, jsonErr := json.Marshal(response)
+	renderResponseJSONResponse(httpResponse, httpRequest, jsonResponse, jsonErr)
 }
 
 func renderUserListResponse(httpResponse http.ResponseWriter, httpRequest *http.Request, users []repos.User) {
@@ -128,21 +116,8 @@ func renderUserListResponse(httpResponse http.ResponseWriter, httpRequest *http.
 		})
 	}
 
-	jsonResponse, err := json.Marshal(returnedUsers)
-	if err != nil {
-		log.Printf("User [src:%v] failed to encode user list: %v", httpRequest.RemoteAddr, err)
-		http.Error(httpResponse, err.Error(), http.StatusInternalServerError)
-
-		return
-	}
-
-	httpResponse.Header().Set("Content-Type", "application/json")
-
-	_, err = httpResponse.Write(jsonResponse)
-	if err != nil {
-		log.Printf("Auth [src:%v] failed to send user list: %v", httpRequest.RemoteAddr, err)
-		http.Error(httpResponse, err.Error(), http.StatusInternalServerError)
-	}
+	jsonResponse, jsonErr := json.Marshal(returnedUsers)
+	renderResponseJSONResponse(httpResponse, httpRequest, jsonResponse, jsonErr)
 }
 
 func isAuthorizedAdminRequest(httpRequest *http.Request) (authorized bool) {
@@ -154,7 +129,7 @@ func isAuthorizedAdminRequest(httpRequest *http.Request) (authorized bool) {
 	}
 
 	if !claims.IsAdmin() {
-		log.Printf("[%v]: %s is not allowed to perform action", httpRequest.RemoteAddr, claims.Email)
+		log.Printf("User [%v]: %s is not allowed to perform action", httpRequest.RemoteAddr, claims.Email)
 
 		return false
 	}
@@ -185,7 +160,7 @@ func (u *UserHandler) List(httpResponse http.ResponseWriter, httpRequest *http.R
 	pageSize := 10
 	pageQueried := sanitize.AlphaNumeric(httpRequest.URL.Query().Get("page"), false)
 	perPage := sanitize.AlphaNumeric(httpRequest.URL.Query().Get("per_page"), false)
-	searchQuery := sanitize.SingleLine(sanitize.Punctuation(httpRequest.URL.Query().Get("search")))
+	searchQuery := sanitize.SingleLine(httpRequest.URL.Query().Get("search"))
 
 	if len(pageQueried) > 0 {
 		pageNumber, err = strconv.Atoi(pageQueried)
@@ -221,8 +196,8 @@ func (u *UserHandler) List(httpResponse http.ResponseWriter, httpRequest *http.R
 			log.Printf("User/List [%v]: query for users (search=%s) and had no results", httpRequest.RemoteAddr, searchQuery)
 			users = []repos.User{}
 		} else {
-			log.Printf("User/List [%v]: could not get user list (page:%d, pageSize:%d): %v", httpRequest.RemoteAddr, pageNumber, pageSize, err)
-			http.Error(httpResponse, "not authorized to list users", http.StatusUnauthorized)
+			log.Printf("User/List [%v]: could not get user list (page:%d, pageSize:%d search:%s): %v", httpRequest.RemoteAddr, pageNumber, pageSize, searchQuery, err)
+			http.Error(httpResponse, "failed to query database", http.StatusInternalServerError)
 
 			return
 		}
@@ -275,9 +250,6 @@ func (u *UserHandler) View(httpResponse http.ResponseWriter, httpRequest *http.R
 
 func (u *UserHandler) Renew(httpResponse http.ResponseWriter, httpRequest *http.Request) {
 	defer func() { _ = httpRequest.Body.Close() }()
-
-	// Password will be return and should not be stored in cache
-	forceHTTPNoCache(httpResponse)
 
 	claims, _ := helpers.AuthClaimsFromContext(httpRequest.Context())
 	vars := mux.Vars(httpRequest)

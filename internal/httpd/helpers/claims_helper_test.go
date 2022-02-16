@@ -17,27 +17,9 @@ func TestNewAuthClaims(t *testing.T) {
 		t.Parallel()
 		fake := faker.New()
 
-		claims := helpers.NewAuthClaims(fake.Internet().Email(), fake.Person().Name(), fake.Internet().URL(), "")
+		claims := helpers.NewAuthClaims(fake.Internet().Email(), fake.Person().Name(), fake.Internet().URL(), helpers.UserRoleString)
 
 		assert.Greater(t, claims.StandardClaims.ExpiresAt, time.Now().Unix())
-	})
-}
-
-func TestContextWithClaims(t *testing.T) {
-	t.Parallel()
-
-	t.Run("Stores claims in context without modification", func(t *testing.T) {
-		t.Parallel()
-		fake := faker.New()
-
-		claims := helpers.NewAuthClaims(fake.Internet().Email(), fake.Person().Name(), fake.Internet().URL(), "")
-		claimsCtx := claims.ContextWithClaims(context.Background())
-
-		claimsFromContext, ok := helpers.AuthClaimsFromContext(claimsCtx)
-		assert.True(t, ok)
-		assert.NotNil(t, claimsFromContext)
-		assert.Equal(t, claims.Email, claimsFromContext.Email)
-		assert.Equal(t, claims.StandardClaims.ExpiresAt, claimsFromContext.StandardClaims.ExpiresAt)
 	})
 }
 
@@ -57,7 +39,7 @@ func TestAuthClaimsFromContext(t *testing.T) {
 		t.Parallel()
 		fake := faker.New()
 
-		claims := helpers.NewAuthClaims(fake.Internet().Email(), fake.Person().Name(), fake.Internet().URL(), "")
+		claims := helpers.NewAuthClaims(fake.Internet().Email(), fake.Person().Name(), fake.Internet().URL(), helpers.UserRoleString)
 		claimsCtx := claims.ContextWithClaims(context.Background())
 
 		claimsFromContext, ok := helpers.AuthClaimsFromContext(claimsCtx)
@@ -68,14 +50,32 @@ func TestAuthClaimsFromContext(t *testing.T) {
 	})
 }
 
-func TestRefresh(t *testing.T) {
+func TestAuthClaims_ContextWithClaims(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Stores claims in context without modification", func(t *testing.T) {
+		t.Parallel()
+		fake := faker.New()
+
+		claims := helpers.NewAuthClaims(fake.Internet().Email(), fake.Person().Name(), fake.Internet().URL(), helpers.UserRoleString)
+		claimsCtx := claims.ContextWithClaims(context.Background())
+
+		claimsFromContext, ok := helpers.AuthClaimsFromContext(claimsCtx)
+		assert.True(t, ok)
+		assert.NotNil(t, claimsFromContext)
+		assert.Equal(t, claims.Email, claimsFromContext.Email)
+		assert.Equal(t, claims.StandardClaims.ExpiresAt, claimsFromContext.StandardClaims.ExpiresAt)
+	})
+}
+
+func TestAuthClaims_Refresh(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Updates expiry on struct", func(t *testing.T) {
 		t.Parallel()
 		fake := faker.New()
 
-		claims := helpers.NewAuthClaims(fake.Internet().Email(), fake.Person().Name(), fake.Internet().URL(), "")
+		claims := helpers.NewAuthClaims(fake.Internet().Email(), fake.Person().Name(), fake.Internet().URL(), helpers.UserRoleString)
 		claimsOriginalExpiry := time.Now().Add(-1 * time.Minute).Unix()
 		claims.StandardClaims.ExpiresAt = claimsOriginalExpiry
 		returnedClaims := claims.Refresh()
@@ -83,5 +83,45 @@ func TestRefresh(t *testing.T) {
 		assert.NotEqual(t, claimsOriginalExpiry, claims.StandardClaims.ExpiresAt)
 		assert.Greater(t, claims.StandardClaims.ExpiresAt, time.Now().Unix())
 		assert.Equal(t, claims, returnedClaims)
+	})
+}
+
+func TestAuthClaims_IsAdmin(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Return true if email is has the admin role", func(t *testing.T) {
+		t.Parallel()
+		fake := faker.New()
+
+		claims := helpers.NewAuthClaims(fake.Internet().Email(), fake.Person().Name(), fake.Internet().URL(), helpers.AdminRoleString)
+
+		assert.True(t, claims.IsAdmin())
+	})
+
+	t.Run("Return false if email is has the user role", func(t *testing.T) {
+		t.Parallel()
+		fake := faker.New()
+
+		claims := helpers.NewAuthClaims(fake.Internet().Email(), fake.Person().Name(), fake.Internet().URL(), helpers.UserRoleString)
+
+		assert.False(t, claims.IsAdmin())
+	})
+
+	t.Run("Return false if email is has empty role", func(t *testing.T) {
+		t.Parallel()
+		fake := faker.New()
+
+		claims := helpers.NewAuthClaims(fake.Internet().Email(), fake.Person().Name(), fake.Internet().URL(), "")
+
+		assert.False(t, claims.IsAdmin())
+	})
+
+	t.Run("Return false if email is has unknown role", func(t *testing.T) {
+		t.Parallel()
+		fake := faker.New()
+
+		claims := helpers.NewAuthClaims(fake.Internet().Email(), fake.Person().Name(), fake.Internet().URL(), "unknown")
+
+		assert.False(t, claims.IsAdmin())
 	})
 }
