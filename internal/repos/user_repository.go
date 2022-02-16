@@ -30,7 +30,11 @@ type User struct {
 var (
 	ErrUserNotFound     = errors.New("queried user could not be not found")
 	ErrUserAlreadyExist = errors.New("user with same email already exist in database")
+	ErrInvalidEmail     = errors.New("invalid user email field")
+	ErrInvalidPassword  = errors.New("invalid password")
 )
+
+const UserRepositoryListMaxLimit = 100
 
 // NewUserRepository returns a ready to use UserRepository with a new database connexion.
 func NewUserRepository(db *sqlx.DB) (*UserRepository, error) {
@@ -101,6 +105,14 @@ func (r *UserRepository) FindByEmail(email string) (*User, error) {
 // Create INSERT a new user record with email and argon2id password hash from the provided password.
 // If the user already exists returns the record from the Database, otherwise return the newly created User.
 func (r *UserRepository) Create(email string, name string, picture string, password string) (*User, error) {
+	if len(email) == 0 {
+		return nil, ErrInvalidEmail
+	}
+
+	if len(password) < 6 {
+		return nil, ErrInvalidPassword
+	}
+
 	if r.Exists(email) {
 		return nil, ErrUserAlreadyExist
 	}
@@ -295,8 +307,6 @@ func (r *UserRepository) Authenticate(email string, password string) (bool, erro
 
 	return authenticated, nil
 }
-
-const UserRepositoryListMaxLimit = 100
 
 // AllUsers Return list of users sorted by email.
 // Passing 0 as the limit will use UserRepositoryListMaxLimit as the limit.
