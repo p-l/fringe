@@ -2,6 +2,7 @@ package handlers_test
 
 import (
 	"bytes"
+	"encoding/json"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -15,72 +16,41 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestAuthHandler_RootHandler(t *testing.T) {
-	t.Parallel()
-
-	t.Run("Redirects to google", func(t *testing.T) {
-		t.Parallel()
-
-		authPath := "/auth/"
-
-		googleOAuth := services.NewGoogleOAuthService(nil, "id", "secret", "callback")
-		authHandler := handlers.NewAuthHandler(googleOAuth, nil)
-
-		req := httptest.NewRequest(http.MethodGet, authPath, nil)
-		res := httptest.NewRecorder()
-
-		router := mux.NewRouter()
-		router.HandleFunc(authPath, authHandler.RootHandler)
-		router.ServeHTTP(res, req)
-
-		// Ensure redirect
-		assert.Equal(t, http.StatusFound, res.Result().StatusCode)
-
-		// URL domain is google.com
-		location, _ := res.Result().Location()
-		assert.Contains(t, location.Host, "google.com")
-	})
-}
-
-const googleTokenAPIURL = "https://oauth2.googleapis.com/token"
-
-func TestAuthHandler_GoogleCallbackHandler(t *testing.T) {
+func TestAuthHandler_Login(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Refuse authentication to outside domains", func(t *testing.T) {
 		t.Parallel()
 
-		callbackPath := "/auth/google/callback"
-
 		client := mocks.NewMockHTTPClient(func(req *http.Request) *http.Response {
-			url := req.URL.String()
-			switch url {
-			case googleTokenAPIURL:
-				return &http.Response{
-					StatusCode: http.StatusOK,
-					Body:       ioutil.NopCloser(bytes.NewBufferString(`{ "access_token": "an_access_token", "expires_in": 42, "scope": "a_scope", "token_type": "bearer_test", "id_token": "an_id_token" }`)),
-					Header:     make(http.Header),
-				}
-			default:
-				return &http.Response{
-					StatusCode: http.StatusOK,
-					Body: ioutil.NopCloser(bytes.NewBufferString(
-						`{ "sub": "a_sub", "email": "email@domain.com", "email_verified": true, "picture": "https://profile/picture/url", "hd": "domain.com" }`)),
-					Header: make(http.Header),
-				}
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body: ioutil.NopCloser(bytes.NewBufferString(
+					`{ "sub": "a_sub", "email": "email@domain.com", "email_verified": true, "picture": "https://profile/picture/url", "hd": "domain.com" }`)),
+				Header: make(http.Header),
 			}
 		})
 
 		googleOAuth := services.NewGoogleOAuthService(client, "id", "secret", "callback")
 		authHelper := helpers.NewAuthHelper("test.com", "secret", []string{})
+		userRepo := mocks.NewMockUserRepository(t)
 
-		authHandler := handlers.NewAuthHandler(googleOAuth, authHelper)
+		authHandler := handlers.NewAuthHandler(userRepo, googleOAuth, authHelper)
 
-		req := httptest.NewRequest(http.MethodGet, callbackPath, nil)
+		loginRequest := handlers.LoginRequest{
+			AccessToken: "test_token",
+			TokenType:   "token",
+		}
+		jsonBytes, err := json.Marshal(loginRequest)
+		assert.NoError(t, err)
+
+		req := httptest.NewRequest(http.MethodPost, "/auth/", bytes.NewBuffer(jsonBytes))
+		req.Header.Set("Content-Type", "application/json")
+
 		res := httptest.NewRecorder()
 
 		router := mux.NewRouter()
-		router.HandleFunc(callbackPath, authHandler.GoogleCallbackHandler)
+		router.HandleFunc("/auth/", authHandler.Login)
 		router.ServeHTTP(res, req)
 
 		// Ensure Access Deny for domain reason
@@ -90,51 +60,110 @@ func TestAuthHandler_GoogleCallbackHandler(t *testing.T) {
 		assert.Contains(t, body, "Domain is not allowed")
 	})
 
-	t.Run("Set cookie on successful auth", func(t *testing.T) {
+	t.Run("Returns token on successful auth", func(t *testing.T) {
 		t.Parallel()
 
-		callbackPath := "/auth/"
-
 		client := mocks.NewMockHTTPClient(func(req *http.Request) *http.Response {
-			url := req.URL.String()
-			switch url {
-			case googleTokenAPIURL:
-				return &http.Response{
-					StatusCode: http.StatusOK,
-					Body:       ioutil.NopCloser(bytes.NewBufferString(`{ "access_token": "an_access_token", "expires_in": 42, "scope": "a_scope", "token_type": "bearer_test", "id_token": "an_id_token" }`)),
-					Header:     make(http.Header),
-				}
-			default:
-				return &http.Response{
-					StatusCode: http.StatusOK,
-					Body: ioutil.NopCloser(bytes.NewBufferString(
-						`{ "sub": "a_sub", "email": "email@test.com", "email_verified": true, "picture": "https://profile/picture/url", "hd": "domain.com" }`)),
-					Header: make(http.Header),
-				}
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body: ioutil.NopCloser(bytes.NewBufferString(
+					`{ "sub": "a_sub", "email": "email@test.com", "email_verified": true, "picture": "https://profile/picture/url", "name": "Person Name", "hd": "domain.com" }`)),
+				Header: make(http.Header),
 			}
 		})
 
 		googleOAuth := services.NewGoogleOAuthService(client, "id", "secret", "callback")
 		authHelper := helpers.NewAuthHelper("test.com", "secret", []string{})
+		userRepo := mocks.NewMockUserRepository(t)
+		authHandler := handlers.NewAuthHandler(userRepo, googleOAuth, authHelper)
 
-		authHandler := handlers.NewAuthHandler(googleOAuth, authHelper)
+		loginRequest := handlers.LoginRequest{
+			AccessToken: "test_token",
+			TokenType:   "token_type",
+		}
+		jsonBytes, err := json.Marshal(loginRequest)
+		assert.NoError(t, err)
 
-		req := httptest.NewRequest(http.MethodGet, callbackPath, nil)
+		req := httptest.NewRequest(http.MethodPost, "/auth/", bytes.NewBuffer(jsonBytes))
+		req.Header.Set("Content-Type", "application/json")
+
 		res := httptest.NewRecorder()
 
 		router := mux.NewRouter()
-		router.HandleFunc(callbackPath, authHandler.GoogleCallbackHandler)
+		router.HandleFunc("/auth/", authHandler.Login)
 		router.ServeHTTP(res, req)
 
-		// Redirect to protected resource
-		assert.Equal(t, http.StatusFound, res.Result().StatusCode)
+		assert.Equal(t, http.StatusOK, res.Result().StatusCode)
 
-		// Included the cookie
-		cookies := res.Result().Cookies()
-		assert.NotNil(t, cookies)
-		assert.Equal(t, 1, len(cookies))
+		// includes bearer token in response
+		var response handlers.LoginResponse
+		err = json.Unmarshal(res.Body.Bytes(), &response)
+		assert.NoError(t, err)
 
-		authCookie := cookies[0]
-		assert.Equal(t, "token", authCookie.Name)
+		assert.NotEmpty(t, response.Token)
+		assert.Equal(t, response.TokenType, "Bearer")
+	})
+
+	t.Run("Returns error on invalid post data", func(t *testing.T) {
+		t.Parallel()
+
+		client := mocks.NewMockHTTPClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       nil,
+				Header:     make(http.Header),
+			}
+		})
+
+		googleOAuth := services.NewGoogleOAuthService(client, "id", "secret", "callback")
+		authHelper := helpers.NewAuthHelper("test.com", "secret", []string{})
+		userRepo := mocks.NewMockUserRepository(t)
+		authHandler := handlers.NewAuthHandler(userRepo, googleOAuth, authHelper)
+
+		req := httptest.NewRequest(http.MethodPost, "/auth/", nil)
+		req.Header.Set("Content-Type", "application/json")
+
+		res := httptest.NewRecorder()
+
+		router := mux.NewRouter()
+		router.HandleFunc("/auth/", authHandler.Login)
+		router.ServeHTTP(res, req)
+
+		assert.Equal(t, http.StatusUnauthorized, res.Result().StatusCode)
+	})
+
+	t.Run("Returns error on refused Google user info", func(t *testing.T) {
+		t.Parallel()
+
+		client := mocks.NewMockHTTPClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: http.StatusUnauthorized,
+				Body:       nil,
+				Header:     make(http.Header),
+			}
+		})
+
+		googleOAuth := services.NewGoogleOAuthService(client, "id", "secret", "callback")
+		authHelper := helpers.NewAuthHelper("test.com", "secret", []string{})
+		userRepo := mocks.NewMockUserRepository(t)
+		authHandler := handlers.NewAuthHandler(userRepo, googleOAuth, authHelper)
+
+		loginRequest := handlers.LoginRequest{
+			AccessToken: "invalid_test_token",
+			TokenType:   "token_type",
+		}
+		jsonBytes, err := json.Marshal(loginRequest)
+		assert.NoError(t, err)
+
+		req := httptest.NewRequest(http.MethodPost, "/auth/", bytes.NewBuffer(jsonBytes))
+		req.Header.Set("Content-Type", "application/json")
+
+		res := httptest.NewRecorder()
+
+		router := mux.NewRouter()
+		router.HandleFunc("/auth/", authHandler.Login)
+		router.ServeHTTP(res, req)
+
+		assert.Equal(t, http.StatusUnauthorized, res.Result().StatusCode)
 	})
 }

@@ -8,17 +8,21 @@ import (
 	"github.com/mrz1836/go-sanitize"
 )
 
-type LogMiddleware struct{}
-
-func NewLogMiddleware() *LogMiddleware {
-	return &LogMiddleware{}
+type LogMiddleware struct {
+	logger *log.Logger
 }
 
-func (u *LogMiddleware) LogRequests(next http.Handler) http.Handler {
+func NewLogMiddleware(logger *log.Logger) *LogMiddleware {
+	return &LogMiddleware{
+		logger: logger,
+	}
+}
+
+func (l *LogMiddleware) LogRequests(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(httpResponse http.ResponseWriter, httpRequest *http.Request) {
 		requestURL, err := url.Parse(httpRequest.URL.String())
 		if err != nil {
-			log.Printf("%s <%v> [src:%v]", httpRequest.Method, err, httpRequest.RemoteAddr)
+			l.logger.Printf("%s <%v> [src:%v]", httpRequest.Method, err, httpRequest.RemoteAddr)
 			next.ServeHTTP(httpResponse, httpRequest)
 
 			return
@@ -33,7 +37,7 @@ func (u *LogMiddleware) LogRequests(next http.Handler) http.Handler {
 		}
 		requestURL.RawQuery = urlQuery.Encode()
 
-		log.Printf("%s %v [src:%v]", httpRequest.Method, sanitize.URL(requestURL.String()), httpRequest.RemoteAddr)
+		l.logger.Printf("%s %v [src:%v]", httpRequest.Method, sanitize.URL(requestURL.String()), httpRequest.RemoteAddr)
 		// Call the next handlers, which can be another middlewares in the chain, or the final handlers.
 		next.ServeHTTP(httpResponse, httpRequest)
 	})

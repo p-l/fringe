@@ -1,35 +1,58 @@
 package handlers
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
+	"time"
 
-	"github.com/mrz1836/go-sanitize"
 	"github.com/p-l/fringe/internal/httpd/helpers"
 	"github.com/p-l/fringe/internal/httpd/services"
+	"github.com/p-l/fringe/internal/repos"
 )
 
 type AuthHandler struct {
 	authHelper  *helpers.AuthHelper
 	googleOAuth *services.GoogleOAuthService
+	userRepo    *repos.UserRepository
 }
 
-func NewAuthHandler(googleOAuthService *services.GoogleOAuthService, authHelper *helpers.AuthHelper) *AuthHandler {
+type LoginRequest struct {
+	AccessToken string `json:"access_token"`
+	TokenType   string `json:"token_type"`
+}
+
+type LoginResponse struct {
+	TokenType string `json:"token_type"`
+	Token     string `json:"token"`
+	Duration  int64  `json:"duration"`
+	Role      string `json:"role"`
+}
+
+func NewAuthHandler(userRepo *repos.UserRepository, googleOAuthService *services.GoogleOAuthService, authHelper *helpers.AuthHelper) *AuthHandler {
 	return &AuthHandler{
 		authHelper:  authHelper,
 		googleOAuth: googleOAuthService,
+		userRepo:    userRepo,
 	}
 }
 
-// GoogleCallbackHandler handles "/auth/google/callback"
-// the path portion of the GoogleOAuthClientConfig.RedirectURI.
-func (a *AuthHandler) GoogleCallbackHandler(httpResponse http.ResponseWriter, httpRequest *http.Request) {
+// Login validates Google token and create JWT if its valid.
+func (a *AuthHandler) Login(httpResponse http.ResponseWriter, httpRequest *http.Request) {
 	defer func() { _ = httpRequest.Body.Close() }()
 
-	parsedQuery := httpRequest.URL.Query()
-	code := sanitize.SingleLine(parsedQuery.Get("code"))
+	var data LoginRequest
+	decoder := json.NewDecoder(httpRequest.Body)
 
-	googleUserInfo, err := a.googleOAuth.AuthenticateUserWithCode(httpRequest.Context(), code)
+	err := decoder.Decode(&data)
+	if err != nil {
+		log.Printf("Auth [src:%v] invalid post data %v", httpRequest.RemoteAddr, err)
+		http.Error(httpResponse, "Unable to validate code", http.StatusUnauthorized)
+
+		return
+	}
+
+	googleUserInfo, err := a.googleOAuth.AuthenticateUserWithToken(httpRequest.Context(), data.TokenType, data.AccessToken)
 	if err != nil {
 		log.Printf("Auth [src:%v] invalid token %v", httpRequest.RemoteAddr, err)
 		http.Error(httpResponse, "Unable to validate code", http.StatusUnauthorized)
@@ -44,20 +67,31 @@ func (a *AuthHandler) GoogleCallbackHandler(httpResponse http.ResponseWriter, ht
 		return
 	}
 
-	permissions := a.authHelper.PermissionsForEmail(googleUserInfo.Email)
-	claims := helpers.NewAuthClaims(googleUserInfo.Email, permissions)
-	cookie := a.authHelper.NewJWTCookieFromClaims(claims)
-	http.SetCookie(httpResponse, cookie)
-	http.Redirect(httpResponse, httpRequest, "/", http.StatusFound)
-}
+	role := a.authHelper.RoleForEmail(googleUserInfo.Email)
+	claims := helpers.NewAuthClaims(googleUserInfo.Email, googleUserInfo.Name, googleUserInfo.Picture, role)
+	signedTokenString := a.authHelper.NewJWTSignedString(claims)
+	duration := time.Unix(claims.ExpiresAt, 0).Unix() - time.Now().Unix()
 
-// RootHandler handles "/auth"
-// Redirect to Google Authentication page for the moment.
-// NOTE: When more than one OAuth provider is supported the behaviour will change.
-func (a *AuthHandler) RootHandler(httpResponse http.ResponseWriter, httpRequest *http.Request) {
-	defer func() { _ = httpRequest.Body.Close() }()
+	response := LoginResponse{TokenType: "Bearer", Token: signedTokenString, Duration: duration, Role: role}
 
-	googleAuthURL := a.googleOAuth.RedirectURL()
+	jsonResponse, err := json.Marshal(response)
+	if err != nil {
+		log.Printf("Auth [src:%v] failed to encode token (for %s): %v", httpRequest.RemoteAddr, claims.Email, err)
+		http.Error(httpResponse, err.Error(), http.StatusInternalServerError)
 
-	http.Redirect(httpResponse, httpRequest, googleAuthURL, http.StatusFound)
+		return
+	}
+
+	httpResponse.Header().Set("Content-Type", "application/json")
+
+	_, err = httpResponse.Write(jsonResponse)
+	if err != nil {
+		log.Printf("Auth [src:%v] failed to send response token for %s: %v", httpRequest.RemoteAddr, claims.Email, err)
+		http.Error(httpResponse, err.Error(), http.StatusInternalServerError)
+
+		return
+	}
+
+	// try to update the profile if the user exists
+	_, _ = a.userRepo.UpdateProfile(claims.Email, claims.Name, claims.Picture)
 }

@@ -25,7 +25,7 @@ func (h *redirectHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // NewRedirectServer Create and configure the HTTP server that redirect to https server.
 func NewRedirectServer(listenAddress string, serverDomain string, certManager *autocert.Manager) *http.Server {
-	requestLogger := middlewares.NewLogMiddleware()
+	requestLogger := middlewares.NewLogMiddleware(log.Default())
 	redirect := new(redirectHandler)
 	redirect.domain = serverDomain
 

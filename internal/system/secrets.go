@@ -72,6 +72,13 @@ func LoadSecretsFromFile(file string) Secrets {
 }
 
 func SaveSecretsToFile(secrets Secrets, file string) {
-	jsonData, _ := json.MarshalIndent(secrets, "", " ")
-	_ = ioutil.WriteFile(filepath.Clean(file), jsonData, secretsFilePermission)
+	jsonData, err := json.MarshalIndent(secrets, "", " ")
+	if err != nil {
+		log.Fatalf("Unable to create JSON from scecret: %v", err)
+	}
+
+	err = ioutil.WriteFile(filepath.Clean(file), jsonData, secretsFilePermission)
+	if err != nil {
+		log.Fatalf("Unable to create JSON to write scecret file: %v", err)
+	}
 }

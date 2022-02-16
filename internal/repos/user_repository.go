@@ -17,16 +17,26 @@ type UserRepository struct {
 }
 
 type User struct {
-	Email        string `db:"email"`
-	PasswordHash string `db:"password"`
-	CreatedAt    int64  `db:"created_at"`
-	UpdatedAt    int64  `db:"updated_at"`
-	LastSeenAt   int64  `db:"last_seen_at"`
+	Email             string `db:"email"`
+	Name              string `db:"name"`
+	Picture           string `db:"picture"`
+	PasswordHash      string `db:"password"`
+	CreatedAt         int64  `db:"created_at"`
+	ProfileUpdatedAt  int64  `db:"profile_updated_at"`
+	PasswordUpdatedAt int64  `db:"password_updated_at"`
+	LastSeenAt        int64  `db:"last_seen_at"`
 }
 
 var (
 	ErrUserNotFound     = errors.New("queried user could not be not found")
 	ErrUserAlreadyExist = errors.New("user with same email already exist in database")
+	ErrInvalidEmail     = errors.New("invalid user email field")
+	ErrInvalidPassword  = errors.New("invalid password")
+)
+
+const (
+	UserRepositoryListMaxLimit = 100
+	UserPasswordMinLen         = 6
 )
 
 // NewUserRepository returns a ready to use UserRepository with a new database connexion.
@@ -45,8 +55,11 @@ func createUserTable(db *sqlx.DB) error {
 	createTx.MustExec("CREATE TABLE IF NOT EXISTS users (" +
 		"email string NOT NULL, " +
 		"password string NOT NULL, " +
-		"created_at int64, " +
-		"updated_at int64, " +
+		"name string NOT NULL, " +
+		"picture string," +
+		"created_at int64," +
+		"profile_updated_at int64," +
+		"password_updated_at int64," +
 		"last_seen_at int64)")
 	createTx.MustExec("CREATE INDEX IF NOT EXISTS idx_users_email ON users (email)")
 
@@ -77,10 +90,11 @@ func (u *User) PasswordMatch(password string) bool {
 	return valid
 }
 
-// UserWithEmail Looks for a user record that matches the provided email and returns a pointer to User stuck if found or nil if not.
-func (r *UserRepository) UserWithEmail(email string) (user *User, err error) {
-	var u User
-	if err := r.db.Get(&u, "SELECT email,password,created_at,updated_at,last_seen_at FROM users WHERE email == $1 LIMIT 1", email); err != nil {
+// FindByEmail Looks for a user record that matches the provided email and returns a pointer to User stuck if found or nil if not.
+func (r *UserRepository) FindByEmail(email string) (*User, error) {
+	var user User
+
+	if err := r.db.Get(&user, "SELECT * FROM users WHERE email == $1 LIMIT 1", email); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrUserNotFound
 		}
@@ -88,20 +102,22 @@ func (r *UserRepository) UserWithEmail(email string) (user *User, err error) {
 		return nil, fmt.Errorf("could not retrieve user %s: %w", email, err)
 	}
 
-	return &u, nil
+	return &user, nil
 }
 
-// CreateUser INSERT a new user record with email and argon2id password hash from the provided password.
+// Create INSERT a new user record with email and argon2id password hash from the provided password.
 // If the user already exists returns the record from the Database, otherwise return the newly created User.
-func (r *UserRepository) CreateUser(email string, password string) (*User, error) {
-	dbUser, err := r.UserWithEmail(email)
-	if !errors.Is(err, ErrUserNotFound) && err != nil {
-		return nil, err
+func (r *UserRepository) Create(email string, name string, picture string, password string) (*User, error) {
+	if len(email) == 0 {
+		return nil, ErrInvalidEmail
 	}
 
-	// Return user if it already exists
-	if dbUser != nil {
-		return dbUser, ErrUserAlreadyExist
+	if len(password) < UserPasswordMinLen {
+		return nil, ErrInvalidPassword
+	}
+
+	if r.Exists(email) {
+		return nil, ErrUserAlreadyExist
 	}
 
 	// Create User
@@ -111,7 +127,16 @@ func (r *UserRepository) CreateUser(email string, password string) (*User, error
 	}
 
 	now := time.Now()
-	newUser := User{email, hash, now.Unix(), now.Unix(), now.Unix()}
+	newUser := User{
+		Email:             email,
+		Name:              name,
+		Picture:           picture,
+		PasswordHash:      hash,
+		LastSeenAt:        now.Unix(),
+		CreatedAt:         now.Unix(),
+		ProfileUpdatedAt:  now.Unix(),
+		PasswordUpdatedAt: now.Unix(),
+	}
 
 	insertTx, err := r.db.Begin()
 	if err != nil {
@@ -120,13 +145,13 @@ func (r *UserRepository) CreateUser(email string, password string) (*User, error
 	defer func() { _ = insertTx.Rollback() }() //nolint:wsl
 
 	// Insert record in the database
-	insert, err := insertTx.Prepare("INSERT INTO users (email, password, created_at, updated_at, last_seen_at) VALUES ($1,$2,$3,$4,$5)")
+	insert, err := insertTx.Prepare("INSERT INTO users (email, name, picture, password, created_at, profile_updated_at, password_updated_at, last_seen_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)")
 	if err != nil {
 		return nil, fmt.Errorf("could not create user %s: %w", email, err)
 	}
 	defer insert.Close()
 
-	_, err = insert.Exec(newUser.Email, newUser.PasswordHash, newUser.CreatedAt, newUser.UpdatedAt, newUser.LastSeenAt)
+	_, err = insert.Exec(newUser.Email, newUser.Name, newUser.Picture, newUser.PasswordHash, newUser.CreatedAt, newUser.ProfileUpdatedAt, newUser.PasswordUpdatedAt, newUser.LastSeenAt)
 	if err != nil {
 		return nil, fmt.Errorf("could not create user %s: %w", email, err)
 	}
@@ -138,9 +163,13 @@ func (r *UserRepository) CreateUser(email string, password string) (*User, error
 	return &newUser, nil
 }
 
-// UpdateUserPassword replaces the specified user's (found by email address) by the password provided.
+// UpdatePassword replaces the specified user's (found by email address) by the password provided.
 // The password is not stored as is. It is hashed with argon2id.
-func (r *UserRepository) UpdateUserPassword(email string, password string) (bool, error) {
+func (r *UserRepository) UpdatePassword(email string, password string) (updated bool, err error) {
+	if !r.Exists(email) {
+		return false, ErrUserNotFound
+	}
+
 	hash, err := CreatePasswordHash(password)
 	if err != nil {
 		return false, err
@@ -155,13 +184,13 @@ func (r *UserRepository) UpdateUserPassword(email string, password string) (bool
 	now := time.Now()
 
 	// Insert or update record in the database
-	stmt, err := updateTx.Prepare("UPDATE users SET password = $1, updated_at = $2, last_seen_at = $3 WHERE email == $4")
+	stmt, err := updateTx.Prepare("UPDATE users SET password = $1, password_updated_at = $2 WHERE email == $3")
 	if err != nil {
 		return false, fmt.Errorf("could not update %s password: %w", email, err)
 	}
 	defer stmt.Close()
 
-	result, err := stmt.Exec(hash, now.Unix(), now.Unix(), email)
+	result, err := stmt.Exec(hash, now.Unix(), email)
 	if err != nil {
 		return false, fmt.Errorf("could not update %s password: %w", email, err)
 	}
@@ -176,8 +205,56 @@ func (r *UserRepository) UpdateUserPassword(email string, password string) (bool
 	return rowsAffected >= 1, nil
 }
 
-// TouchUser updates user's last_seen_at value with current Unix time.
-func (r *UserRepository) TouchUser(email string) error {
+func (r *UserRepository) UpdateProfile(email string, name string, picture string) (bool, error) {
+	log.Printf("Update Profile: Email:%s Name:%s Picture:%s", email, name, picture)
+
+	if !r.Exists(email) {
+		return false, ErrUserNotFound
+	}
+
+	updateTx, err := r.db.Begin()
+	if err != nil {
+		return false, fmt.Errorf("could not update %s profile information: %w", email, err)
+	}
+	defer func() { _ = updateTx.Rollback() }() //nolint:wsl
+
+	now := time.Now()
+
+	// Insert or update record in the database
+	stmt, err := updateTx.Prepare("UPDATE users SET name = '$1', picture = '$2', profile_updated_at = $3 WHERE email == $4")
+	if err != nil {
+		return false, fmt.Errorf("could not update %s profile information: %w", email, err)
+	}
+	defer stmt.Close()
+
+	result, err := stmt.Exec(name, picture, now.Unix(), email)
+	if err != nil {
+		return false, fmt.Errorf("could not update %s profile information: %w", email, err)
+	}
+
+	err = updateTx.Commit()
+	if err != nil {
+		return false, fmt.Errorf("could not update %s profile information: %w", email, err)
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+
+	return rowsAffected >= 1, nil
+}
+
+func (r *UserRepository) Exists(email string) bool {
+	_, err := r.FindByEmail(email)
+
+	// if err == null then user is present
+	return err == nil
+}
+
+// Seen updates user's last_seen_at value with current Unix time.
+func (r *UserRepository) Seen(email string) error {
+	if !r.Exists(email) {
+		return ErrUserNotFound
+	}
+
 	now := time.Now()
 
 	updateTx, err := r.db.Begin()
@@ -214,18 +291,25 @@ func (r *UserRepository) TouchUser(email string) error {
 	return nil
 }
 
-// AuthenticateUser validates if the email and password combination matches an existing user
+// Authenticate validates if the email and password combination matches an existing user
 // in the database with a password resulting in the same password hash.
-func (r *UserRepository) AuthenticateUser(email string, password string) (bool, error) {
-	user, err := r.UserWithEmail(email)
+// Updates last_seen_at if user is authenticated.
+func (r *UserRepository) Authenticate(email string, password string) (bool, error) {
+	user, err := r.FindByEmail(email)
 	if err != nil {
 		return false, err
 	}
 
-	return user.PasswordMatch(password), nil
-}
+	authenticated := user.PasswordMatch(password)
+	if authenticated {
+		err = r.Seen(email)
+		if err != nil {
+			return false, err
+		}
+	}
 
-const UserRepositoryListMaxLimit = 100
+	return authenticated, nil
+}
 
 // AllUsers Return list of users sorted by email.
 // Passing 0 as the limit will use UserRepositoryListMaxLimit as the limit.
@@ -243,7 +327,7 @@ func (r *UserRepository) AllUsers(limit int, page int) ([]User, error) {
 
 	var users []User
 
-	err := r.db.Select(&users, "SELECT * FROM users ORDER BY email LIMIT $1 OFFSET $2 ", limit, offset)
+	err := r.db.Select(&users, "SELECT * FROM users ORDER BY last_seen_at DESC LIMIT $1 OFFSET $2 ", limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve users (limit: %d offset:%d) %w", limit, offset, err)
 	}
@@ -255,8 +339,37 @@ func (r *UserRepository) AllUsers(limit int, page int) ([]User, error) {
 	return users, nil
 }
 
-// DeleteUser delete user record for given email.
-func (r *UserRepository) DeleteUser(email string) error {
+func (r *UserRepository) FindAllMatching(searchQuery string, limit int, page int) ([]User, error) {
+	offset := 0
+
+	if limit == 0 || limit > UserRepositoryListMaxLimit {
+		limit = UserRepositoryListMaxLimit
+	}
+
+	if page > 1 {
+		offset = (page - 1) * limit
+	}
+
+	var users []User
+
+	err := r.db.Select(&users, "SELECT * FROM users WHERE (email LIKE $1 OR name LIKE $1) ORDER BY email LIMIT $2 OFFSET $3 ", searchQuery, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve users (limit: %d offset:%d) %w", limit, offset, err)
+	}
+
+	if users == nil {
+		return nil, ErrUserNotFound
+	}
+
+	return users, nil
+}
+
+// Delete delete user record for given email.
+func (r *UserRepository) Delete(email string) error {
+	if !r.Exists(email) {
+		return ErrUserNotFound
+	}
+
 	delTx, err := r.db.Begin()
 	if err != nil {
 		return fmt.Errorf("could not delte %s: %w", email, err)

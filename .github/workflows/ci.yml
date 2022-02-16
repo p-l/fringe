@@ -26,6 +26,14 @@ jobs:
       with:
         go-version: 1.17
 
+    - name: Setup Node.js
+      uses: actions/setup-node@v2
+      with:
+        node-version: '16.x'
+
+    - name: Build
+      run: make build
+
     - name: Setup golangci-lint
       uses: golangci/golangci-lint-action@v2
       with:
@@ -36,21 +44,21 @@ jobs:
         # only-new-issues: true
 
         # Optional: if set to true then the action will use pre-installed Go.
-        # skip-go-installation: true
+        skip-go-installation: true
 
         # Optional: if set to true then the action don't cache or restore ~/go/pkg.
-        # skip-pkg-cache: true
+        skip-pkg-cache: true
 
         # Optional: if set to true then the action don't cache or restore ~/.cache/go-build.
-        # skip-build-cache: true
+        skip-build-cache: true
 
-    - name: Run Go Test
+    - name: Run Tests
       run: make test
 
     - name: Upload Code Coverage
       uses: codecov/codecov-action@v2
       with:
-        token: ${{ secrets.CODECOV_TOKEN }} # not required for public repos
-        files: ./coverage.txt               # optional
+        token: ${{ secrets.CODECOV_TOKEN }}
+        files: ./coverage.txt,./client/coverage/coverage-final.json
         fail_ci_if_error: true              # optional (default = false)
         verbose: true                       # optional (default = false)

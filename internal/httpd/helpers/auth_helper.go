@@ -3,9 +3,7 @@ package helpers
 import (
 	"errors"
 	"log"
-	"net/http"
 	"strings"
-	"time"
 
 	"github.com/golang-jwt/jwt"
 )
@@ -18,6 +16,11 @@ type AuthHelper struct {
 
 var ErrInvalidClaimsToken = errors.New("invalid claims token")
 
+const (
+	AdminRoleString = "admin"
+	UserRoleString  = "user"
+)
+
 func NewAuthHelper(allowedDomain string, secret string, adminsEmail []string) *AuthHelper {
 	return &AuthHelper{
 		secret:        secret,
@@ -26,9 +29,7 @@ func NewAuthHelper(allowedDomain string, secret string, adminsEmail []string) *A
 	}
 }
 
-func (h *AuthHelper) NewJWTCookieFromClaims(claims *AuthClaims) *http.Cookie {
-	expirationTime := time.Unix(claims.StandardClaims.ExpiresAt, 0)
-
+func (h *AuthHelper) NewJWTSignedString(claims *AuthClaims) string {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	jwtKey := []byte(h.secret)
 
@@ -37,14 +38,7 @@ func (h *AuthHelper) NewJWTCookieFromClaims(claims *AuthClaims) *http.Cookie {
 		log.Fatalf("!!! Error creating JWT signed string: %v", err)
 	}
 
-	return &http.Cookie{
-		Name:     "token",
-		Value:    tokenString,
-		Expires:  expirationTime,
-		Path:     "/",
-		HttpOnly: true,
-		Secure:   true,
-	}
+	return tokenString
 }
 
 func (h *AuthHelper) AuthClaimsFromSignedToken(tokenString string) (*AuthClaims, error) {
@@ -64,29 +58,16 @@ func (h *AuthHelper) AuthClaimsFromSignedToken(tokenString string) (*AuthClaims,
 	return claims, nil
 }
 
-func (h *AuthHelper) RemoveJWTCookie() *http.Cookie {
-	expirationTime := time.Unix(0, 0)
-
-	return &http.Cookie{
-		Name:     "token",
-		Value:    "",
-		Expires:  expirationTime,
-		Path:     "/",
-		HttpOnly: true,
-		Secure:   true,
-	}
-}
-
 func (h *AuthHelper) InAllowedDomain(email string) bool {
 	return IsEmailInDomain(email, h.AllowedDomain)
 }
 
-func (h *AuthHelper) PermissionsForEmail(email string) string {
+func (h *AuthHelper) RoleForEmail(email string) string {
 	for _, adminEmail := range h.admins {
 		if strings.EqualFold(adminEmail, email) {
-			return "admin"
+			return AdminRoleString
 		}
 	}
 
-	return "user"
+	return UserRoleString
 }

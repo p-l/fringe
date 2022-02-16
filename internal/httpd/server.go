@@ -5,6 +5,8 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -14,6 +16,7 @@ import (
 	"github.com/p-l/fringe/internal/httpd/services"
 	"github.com/p-l/fringe/internal/repos"
 	"github.com/p-l/fringe/internal/system"
+	"github.com/rs/cors"
 )
 
 type Texts struct {
@@ -22,42 +25,60 @@ type Texts struct {
 	PasswordInfoCardItems []string
 }
 
-const httpsTimeouts = time.Second * 5
+const (
+	httpsTimeouts        = time.Second * 5
+	preFlightCacheMaxAge = time.Minute * 5
+)
 
 // NewHTTPServer Create and configure the HTTP server.
-func NewHTTPServer(config system.Config, repo *repos.UserRepository, templates fs.FS, assets fs.FS, jwtSecret string) *http.Server {
+func NewHTTPServer(config system.Config, repo *repos.UserRepository, clientAssets fs.FS, jwtSecret string) *http.Server {
 	googleOAuth := services.NewGoogleOAuthService(http.DefaultClient, config.OAuth.Google.ClientID, config.OAuth.Google.ClientSecret, fmt.Sprintf("https://%s/auth/google/callback", config.Web.Domain))
 
 	authHelper := helpers.NewAuthHelper(config.Security.AllowedDomain, jwtSecret, config.Security.AuthorizedAdminEmails)
-	pageHelper := helpers.NewPageHelper(templates)
 
-	logMiddleware := middlewares.NewLogMiddleware()
-	authMiddleware := middlewares.NewAuthMiddleware("/auth/", []string{"/assets"}, authHelper)
+	logMiddleware := middlewares.NewLogMiddleware(log.Default())
+	authMiddleware := middlewares.NewAuthMiddleware("/auth/", []string{"/api"}, []string{"/api/auth/", "/api/config/"}, authHelper)
 
-	homeHandler := handlers.NewDefaultHandler(repo, pageHelper)
-	authHandler := handlers.NewAuthHandler(googleOAuth, authHelper)
-	userHandler := handlers.NewUserHandler(repo, authHelper, pageHelper)
+	defaultHandler := handlers.NewDefaultHandler()
+	authHandler := handlers.NewAuthHandler(repo, googleOAuth, authHelper)
+	userHandler := handlers.NewUserHandler(repo, authHelper)
+	configHandler := handlers.NewConfigHandler(config.OAuth.Google)
 
 	router := mux.NewRouter()
 	router.Use(logMiddleware.LogRequests)
 	router.Use(authMiddleware.EnsureAuth)
 
-	router.HandleFunc("/", homeHandler.Root).Methods(http.MethodGet)
-	router.HandleFunc("/auth/", authHandler.RootHandler).Methods(http.MethodGet)
-	router.HandleFunc("/auth/google/callback", authHandler.GoogleCallbackHandler).Methods(http.MethodGet)
-	router.HandleFunc("/user/", userHandler.List).Methods("GET")
-	router.HandleFunc("/user/{email}/", userHandler.View).Methods(http.MethodGet, http.MethodDelete)
-	router.HandleFunc("/user/{email}/enroll", userHandler.Enroll).Methods(http.MethodGet)
-	router.HandleFunc("/user/{email}/password", userHandler.Renew).Methods(http.MethodGet)
-	router.HandleFunc("/user/{email}/delete", userHandler.Delete).Methods(http.MethodGet)
-	router.PathPrefix("/assets/").Handler(http.StripPrefix("/assets/", http.FileServer(http.FS(assets))))
+	// Hook the handlers
+	router.HandleFunc("/api/auth/", authHandler.Login).Methods(http.MethodPost)
+	router.HandleFunc("/api/config/", configHandler.Root).Methods(http.MethodGet)
+	router.HandleFunc("/api/users/", userHandler.List).Methods(http.MethodGet)
+	router.HandleFunc("/api/users/", userHandler.Create).Methods(http.MethodPost)
+	router.HandleFunc("/api/users/{email}/", userHandler.View).Methods(http.MethodGet)
+	router.HandleFunc("/api/users/{email}/", userHandler.Delete).Methods(http.MethodDelete)
+	router.HandleFunc("/api/users/{email}/renew/", userHandler.Renew).Methods(http.MethodGet)
 
-	router.NotFoundHandler = http.HandlerFunc(homeHandler.NotFound)
-	http.Handle("/", router)
+	// Serve the web client
+	if len(config.Web.ReverseProxy) == 0 {
+		// Built-in client
+		router.PathPrefix("/").Handler(http.StripPrefix("/", http.FileServer(http.FS(clientAssets))))
+		router.NotFoundHandler = http.HandlerFunc(defaultHandler.NotFound)
+	} else {
+		log.Printf("Using reverse proxy from %s instead of serving files", config.Web.ReverseProxy)
+		proxyURL, err := url.Parse(config.Web.ReverseProxy)
+		if err != nil {
+			log.Panicf("invalid reverse proxy url: %v", err)
+		}
+
+		reverseProxy := httputil.NewSingleHostReverseProxy(proxyURL)
+		router.Handle("/", reverseProxy)
+		router.NotFoundHandler = reverseProxy
+	}
+
+	httpdHandler := addCORS(config.Web.AllowOrigins, router)
 
 	log.Printf("Created httpd server on %s", config.Services.HTTPSBindAddress)
 	httpd := http.Server{
-		Handler:      router,
+		Handler:      httpdHandler,
 		Addr:         config.Services.HTTPSBindAddress,
 		WriteTimeout: httpsTimeouts,
 		ReadTimeout:  httpsTimeouts,
@@ -65,4 +86,21 @@ func NewHTTPServer(config system.Config, repo *repos.UserRepository, templates f
 	}
 
 	return &httpd
+}
+
+func addCORS(allowedOrigins []string, router *mux.Router) http.Handler {
+	for _, origin := range allowedOrigins {
+		log.Printf("HTTPD Allowed Origin: %s", origin)
+	}
+
+	corsHandler := cors.New(cors.Options{
+		AllowCredentials: false,
+		AllowedOrigins:   allowedOrigins,
+		AllowedMethods:   []string{http.MethodGet, http.MethodPost, http.MethodOptions, http.MethodDelete},
+		AllowedHeaders:   []string{"accept", "authorization", "content-type"},
+		MaxAge:           int(preFlightCacheMaxAge.Seconds()),
+		Debug:            true,
+	})
+
+	return corsHandler.Handler(router)
 }

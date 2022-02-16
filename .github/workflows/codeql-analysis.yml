@@ -6,6 +6,11 @@ on:
   pull_request:
     # The branches below must be a subset of the branches above
     branches: [ main ]
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.html'
+      - '**/*.svg'
+      - '**/*.png'
   schedule:
     - cron: '45 22 * * 5'
 
@@ -21,7 +26,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [ 'go' ]
+        language: [ 'go', 'typescript' ]
 
     steps:
     - name: Checkout repository
@@ -32,10 +37,16 @@ jobs:
       with:
         go-version: 1.17
 
+    - name: Setup Node.js
+      uses: actions/setup-node@v2
+      with:
+        node-version: '16.x'
+
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v1
       with:
+        config-file: ./.github/codeql/codeql-config.yml
         languages: ${{ matrix.language }}
         # If you wish to specify custom queries, you can do so here or in a config file.
         # By default, queries listed here will override any specified in a config file.

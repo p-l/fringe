@@ -22,15 +22,12 @@ func NewRadiusServer(repo *repos.UserRepository, secret string) *radius.PacketSe
 			log.Printf("WARN: No password provided in radiusd request from: %v", request.RemoteAddr)
 		}
 
-		authenticated, err := repo.AuthenticateUser(username, password)
+		authenticated, err := repo.Authenticate(username, password)
 		if err != nil {
 			log.Printf("ERR: Could not authenticate request from %v: %v", request.RemoteAddr, err)
 		}
 
 		if authenticated {
-			if err = repo.TouchUser(username); err != nil {
-				log.Printf("ERR: Could not update user's last seen: %v", err)
-			}
 			code = radius.CodeAccessAccept
 		}
 

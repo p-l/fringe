@@ -1,6 +1,7 @@
 package middlewares_test
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -13,15 +14,16 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestEnsureAuth(t *testing.T) {
+const authPath = "/auth/"
+
+func TestAuthMiddleware_EnsureAuth(t *testing.T) {
 	t.Parallel()
 
-	t.Run("redirect to AuthPath if no token is present", func(t *testing.T) {
+	t.Run("Refuse Access to AuthPath if no token is present", func(t *testing.T) {
 		t.Parallel()
 
-		authPath := "/test/auth"
 		authHelper := helpers.NewAuthHelper("@test.com", "secret", []string{})
-		authMiddleware := middlewares.NewAuthMiddleware(authPath, []string{}, authHelper)
+		authMiddleware := middlewares.NewAuthMiddleware(authPath, []string{"/"}, []string{}, authHelper)
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		res := httptest.NewRecorder()
@@ -34,11 +36,7 @@ func TestEnsureAuth(t *testing.T) {
 		router.HandleFunc(authPath, func(writer http.ResponseWriter, request *http.Request) {})
 		router.ServeHTTP(res, req)
 
-		assert.Equal(t, http.StatusFound, res.Result().StatusCode)
-
-		target, err := res.Result().Location()
-		assert.Nil(t, err)
-		assert.Equal(t, authPath, target.Path)
+		assert.Equal(t, http.StatusForbidden, res.Result().StatusCode)
 	})
 
 	t.Run("skips token validation path in excludedPath", func(t *testing.T) {
@@ -46,9 +44,10 @@ func TestEnsureAuth(t *testing.T) {
 
 		testSkipAuthRootPath := "/skip-auth"
 		testSkipAuthSubPath := testSkipAuthRootPath + "/test"
+		protectedPaths := []string{"/"}
 		skipPaths := []string{testSkipAuthRootPath}
 		authHelper := helpers.NewAuthHelper("@test.com", "secret", []string{})
-		authMiddleware := middlewares.NewAuthMiddleware(testSkipAuthRootPath, skipPaths, authHelper)
+		authMiddleware := middlewares.NewAuthMiddleware(testSkipAuthRootPath, protectedPaths, skipPaths, authHelper)
 
 		req := httptest.NewRequest(http.MethodGet, testSkipAuthSubPath, nil)
 		res := httptest.NewRecorder()
@@ -68,20 +67,20 @@ func TestEnsureAuth(t *testing.T) {
 		assert.Equal(t, http.StatusTeapot, res.Result().StatusCode)
 	})
 
-	t.Run("let valid and refreshed tokens through", func(t *testing.T) {
+	t.Run("let valid tokens through", func(t *testing.T) {
 		t.Parallel()
 		fake := faker.New()
 
 		authHelper := helpers.NewAuthHelper("@test.com", "secret", []string{})
-		authMiddleware := middlewares.NewAuthMiddleware("/auth/", []string{"/no-auth"}, authHelper)
+		authMiddleware := middlewares.NewAuthMiddleware("/auth/", []string{"/"}, []string{"/no-auth"}, authHelper)
 
-		validClaims := helpers.NewAuthClaims(fake.Internet().Email(), "")
+		validClaims := helpers.NewAuthClaims(fake.Internet().Email(), fake.Person().Name(), fake.Internet().URL(), "")
 		// Force expiry to be 1 minute in the future
 		validClaims.StandardClaims.ExpiresAt = time.Now().Add(1 * time.Minute).Unix()
-		validTokenCookie := authHelper.NewJWTCookieFromClaims(validClaims)
+		validToken := authHelper.NewJWTSignedString(validClaims)
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
-		req.AddCookie(validTokenCookie)
+		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", validToken))
 		res := httptest.NewRecorder()
 
 		router := mux.NewRouter()
@@ -93,36 +92,23 @@ func TestEnsureAuth(t *testing.T) {
 
 		// Make sure the handler ran by testing for a specific result code.
 		assert.Equal(t, http.StatusTeapot, res.Result().StatusCode)
-
-		// Ensure the token refreshed
-		cookies := res.Result().Cookies()
-		assert.NotNil(t, cookies)
-		assert.Equal(t, 1, len(cookies))
-
-		authCookie := cookies[0]
-		assert.Equal(t, "token", authCookie.Name)
-		assert.Greater(t, authCookie.Expires.Unix(), validClaims.StandardClaims.ExpiresAt)
-
-		cookieClaims, err := authHelper.AuthClaimsFromSignedToken(authCookie.Value)
-		assert.Nil(t, err)
-		assert.Greater(t, cookieClaims.StandardClaims.ExpiresAt, validClaims.StandardClaims.ExpiresAt)
 	})
 
 	t.Run("rejects expired tokens", func(t *testing.T) {
 		t.Parallel()
+
 		fake := faker.New()
 
-		authPath := "/auth/"
 		authHelper := helpers.NewAuthHelper("@test.com", "secret", []string{})
-		authMiddleware := middlewares.NewAuthMiddleware(authPath, []string{"/no-auth"}, authHelper)
+		authMiddleware := middlewares.NewAuthMiddleware(authPath, []string{"/"}, []string{"/no-auth"}, authHelper)
 
-		validClaims := helpers.NewAuthClaims(fake.Internet().Email(), "")
+		validClaims := helpers.NewAuthClaims(fake.Internet().Email(), fake.Person().Name(), fake.Internet().URL(), "")
 		// Force expiry to be 1 minute ago
 		validClaims.StandardClaims.ExpiresAt = time.Now().Add(-1 * time.Minute).Unix()
-		validTokenCookie := authHelper.NewJWTCookieFromClaims(validClaims)
+		validToken := authHelper.NewJWTSignedString(validClaims)
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
-		req.AddCookie(validTokenCookie)
+		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", validToken))
 		res := httptest.NewRecorder()
 
 		router := mux.NewRouter()
@@ -132,21 +118,94 @@ func TestEnsureAuth(t *testing.T) {
 		})
 		router.ServeHTTP(res, req)
 
-		assert.Equal(t, http.StatusFound, res.Result().StatusCode)
+		assert.Equal(t, http.StatusForbidden, res.Result().StatusCode)
+	})
 
-		// Ensure redirected to Auth path
-		target, err := res.Result().Location()
-		assert.Nil(t, err)
-		assert.Equal(t, authPath, target.Path)
+	t.Run("rejects invalid token type strings", func(t *testing.T) {
+		t.Parallel()
+		fake := faker.New()
 
-		// Ensure the token is removed
-		cookies := res.Result().Cookies()
-		assert.NotNil(t, cookies)
-		assert.Equal(t, 1, len(cookies))
+		authHelper := helpers.NewAuthHelper("@test.com", "secret", []string{})
+		authMiddleware := middlewares.NewAuthMiddleware(authPath, []string{"/"}, []string{"/no-auth"}, authHelper)
 
-		authCookie := cookies[0]
-		expectedCookie := authHelper.RemoveJWTCookie()
-		assert.Equal(t, expectedCookie.Name, authCookie.Name)
-		assert.Equal(t, time.Unix(0, 0).Unix(), authCookie.Expires.Unix())
+		validClaims := helpers.NewAuthClaims(fake.Internet().Email(), fake.Person().Name(), fake.Internet().URL(), "")
+		validClaims.StandardClaims.ExpiresAt = time.Now().Add(5 * time.Minute).Unix()
+		validToken := authHelper.NewJWTSignedString(validClaims)
+
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.Header.Add("Authorization", fmt.Sprintf("Bearing %s", validToken))
+		res := httptest.NewRecorder()
+
+		router := mux.NewRouter()
+		router.Use(authMiddleware.EnsureAuth)
+		router.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
+			t.Errorf("Root Handler must not be called")
+		})
+		router.ServeHTTP(res, req)
+
+		assert.Equal(t, http.StatusForbidden, res.Result().StatusCode)
+	})
+
+	t.Run("rejects missing token in authorization strings", func(t *testing.T) {
+		t.Parallel()
+
+		authPath := "/auth/"
+		authHelper := helpers.NewAuthHelper("@test.com", "secret", []string{})
+		authMiddleware := middlewares.NewAuthMiddleware(authPath, []string{"/"}, []string{"/no-auth"}, authHelper)
+
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.Header.Add("Authorization", "Bearer ")
+		res := httptest.NewRecorder()
+
+		router := mux.NewRouter()
+		router.Use(authMiddleware.EnsureAuth)
+		router.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
+			t.Errorf("Root Handler must not be called")
+		})
+		router.ServeHTTP(res, req)
+
+		assert.Equal(t, http.StatusForbidden, res.Result().StatusCode)
+	})
+}
+
+func TestAuthMiddleware_IsProtected(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns false when path is in the excluded list", func(t *testing.T) {
+		t.Parallel()
+
+		authHelper := helpers.NewAuthHelper("@test.com", "secret", []string{})
+		authMiddleware := middlewares.NewAuthMiddleware(authPath, []string{"/"}, []string{"/no-auth"}, authHelper)
+
+		assert.False(t, authMiddleware.IsProtected("/no-auth"))
+	})
+
+	t.Run("returns true when path is in the excluded list", func(t *testing.T) {
+		t.Parallel()
+
+		authHelper := helpers.NewAuthHelper("@test.com", "secret", []string{})
+		authMiddleware := middlewares.NewAuthMiddleware(authPath, []string{"/"}, []string{"/no-auth"}, authHelper)
+
+		assert.True(t, authMiddleware.IsProtected("/"))
+	})
+
+	t.Run("returns true when path is inside the included list", func(t *testing.T) {
+		t.Parallel()
+
+		authHelper := helpers.NewAuthHelper("@test.com", "secret", []string{})
+		authMiddleware := middlewares.NewAuthMiddleware(authPath, []string{"/require-auth"}, []string{"/no-auth"}, authHelper)
+
+		assert.True(t, authMiddleware.IsProtected("/require-auth"))
+		assert.True(t, authMiddleware.IsProtected("/require-auth/"))
+		assert.True(t, authMiddleware.IsProtected("/require-auth/subpath/"))
+	})
+
+	t.Run("returns false when its not inside the included list and not part of excluded list", func(t *testing.T) {
+		t.Parallel()
+
+		authHelper := helpers.NewAuthHelper("@test.com", "secret", []string{})
+		authMiddleware := middlewares.NewAuthMiddleware(authPath, []string{"/require-auth"}, []string{"/no-auth"}, authHelper)
+
+		assert.False(t, authMiddleware.IsProtected("/other-path"))
 	})
 }

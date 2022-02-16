@@ -7,15 +7,15 @@ tmp_dir = "tmp"
 
 [build]
 # Just plain old shell command. You could use `make` as well.
-cmd = "go build -o bin/fringe-air"
+cmd = "go build -ldflags \"-X main.Version=dev\" -o bin/fringe-server-air"
 # Binary file yields from `cmd`.
-bin = "binbin/fringe-air"
+bin = "bin/fringe-server-air"
 # Customize binary, can setup environment variables when run your app.
-full_bin = "APP_ENV=dev bin/fringe-air"
+# full_bin = "bin/fringe-server-air"
 # Watch these filename extensions.
 include_ext = ["go", "gohtml", "css", "toml"]
 # Ignore these filename extensions or directories.
-exclude_dir = ["tmp", "db", "vendor", "scripts", "system"]
+exclude_dir = ["tmp", "config", "packages", "db", "vendor", "scripts", "system", "client", "internal/mocks", "node_modules" ]
 # Watch these directories if you specified.
 include_dir = []
 # Exclude files.
