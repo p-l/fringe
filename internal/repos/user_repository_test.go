@@ -101,7 +101,6 @@ func TestUser_PasswordMatch(t *testing.T) {
 
 		assert.True(t, user.PasswordMatch(password))
 	})
-
 }
 
 func TestUserRepository_FindByEmail(t *testing.T) {
@@ -1016,7 +1015,6 @@ func TestUserRepository_FindAllMatching(t *testing.T) {
 
 	t.Run("", func(t *testing.T) {
 		t.Parallel()
-
 	})
 }
 

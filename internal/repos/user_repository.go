@@ -34,7 +34,10 @@ var (
 	ErrInvalidPassword  = errors.New("invalid password")
 )
 
-const UserRepositoryListMaxLimit = 100
+const (
+	UserRepositoryListMaxLimit = 100
+	UserPasswordMinLen         = 6
+)
 
 // NewUserRepository returns a ready to use UserRepository with a new database connexion.
 func NewUserRepository(db *sqlx.DB) (*UserRepository, error) {
@@ -109,7 +112,7 @@ func (r *UserRepository) Create(email string, name string, picture string, passw
 		return nil, ErrInvalidEmail
 	}
 
-	if len(password) < 6 {
+	if len(password) < UserPasswordMinLen {
 		return nil, ErrInvalidPassword
 	}
 
