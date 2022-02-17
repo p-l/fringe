@@ -23,14 +23,14 @@ do_hash() {
 }
 
 cat << EOF
-Origin: Example Repository
-Label: Example
+Origin: Fringe Repository 
+Label: fringe
 Suite: stable
 Codename: stable
 Version: 1.0
-Architectures: amd64 arm64 arm7
+Architectures: amd64 arm64 arm 386
 Components: main
-Description: An example software repository
+Description: Repository for Fringe packages
 Date: $(date -Ru)
 EOF
 do_hash "MD5Sum" "md5sum"
