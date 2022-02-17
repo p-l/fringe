@@ -1,6 +1,7 @@
-CLIENT_DIR = "client"
+CLIENT_DIR = client
 
-BUILD_PACKAGES_DIR = "packages"
+BUILD_PACKAGES_DIR = packages
+BUILD_REPO_DIR = repo
 BUILD_CLIENT_DIST_DIR = "client/build"
 BUILD_BIN_DIR = "bin"
 BUILD_BIN_FILE := fringe-server
@@ -62,6 +63,21 @@ packages: ## 📦 Build debian packages for easy deployment
 	GOOS=linux GOARCH=amd64 ./scripts/build-deb-package.sh
 	GOOS=linux GOARCH=arm ./scripts/build-deb-package.sh
 	GOOS=linux GOARCH=arm64 ./scripts/build-deb-package.sh
+
+.PHONY: repo
+repo: packages ## 📦 Create an APT repo structure for fringe packages
+	@# Inspired by https://earthly.dev/blog/creating-and-hosting-your-own-deb-packages-and-apt-repo/
+	@rm -rf $(BUILD_REPO_DIR)
+	mkdir -p $(BUILD_REPO_DIR)
+	mkdir -p $(BUILD_REPO_DIR)/pool/main/
+	cp $(BUILD_PACKAGES_DIR)/*.deb $(BUILD_REPO_DIR)/pool/main/
+	@./scripts/generate-repo-packages.sh $(BUILD_REPO_DIR) 386
+	@./scripts/generate-repo-packages.sh $(BUILD_REPO_DIR) amd64 
+	@./scripts/generate-repo-packages.sh $(BUILD_REPO_DIR) arm
+	@./scripts/generate-repo-packages.sh $(BUILD_REPO_DIR) arm64
+	@./scripts/generate-repo-release.sh $(BUILD_REPO_DIR) > $(BUILD_REPO_DIR)/dists/stable/Release
+	@./scripts/sign-repo.sh $(BUILD_REPO_DIR)
+
 
 .PHONY: test
 test: ## 🎯 Unit test for server and client
