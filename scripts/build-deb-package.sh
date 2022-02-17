@@ -63,7 +63,6 @@ bundle exec fpm --verbose \
   --description "$DEB_PACKAGE_DESCRIPTION" \
   --url "$DEB_PACKAGE_URL" \
   --version "$VERSION_STRING" \
-  --license LICENSE.md \
   --architecture "$GOARCH" \
   --iteration 1 \
   --output-type deb \
