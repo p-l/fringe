@@ -10,7 +10,7 @@ import (
 )
 
 // NewRadiusServer Creates and configure the Radius Server.
-func NewRadiusServer(repo *repos.UserRepository, secret string) *radius.PacketServer {
+func NewRadiusServer(repo *repos.UserRepository, secret string, listenAddress string) *radius.PacketServer {
 	handler := func(writer radius.ResponseWriter, request *radius.Request) {
 		username := sanitize.Email(rfc2865.UserName_GetString(request.Packet), false)
 		password := sanitize.SingleLine(rfc2865.UserPassword_GetString(request.Packet))
@@ -39,9 +39,9 @@ func NewRadiusServer(repo *repos.UserRepository, secret string) *radius.PacketSe
 		}
 	}
 
-	log.Printf("Created radius server on :1812")
+	log.Printf("Created radius server on %s", listenAddress)
 	server := radius.PacketServer{
-		Addr:         "127.0.0.1:1812",
+		Addr:         listenAddress,
 		Handler:      radius.HandlerFunc(handler),
 		SecretSource: radius.StaticSecretSource([]byte(secret)),
 	}

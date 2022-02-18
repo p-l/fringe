@@ -103,7 +103,7 @@ func main() {
 	userRepo := openUserRepo(db)
 
 	// Servers
-	radiusSrv := radiusd.NewRadiusServer(userRepo, secrets.Radius)
+	radiusSrv := radiusd.NewRadiusServer(userRepo, secrets.Radius, config.Services.RadiusBindAddress)
 	httpsSrv, redirectSrv := newWebServers(config, userRepo, secrets.JWT)
 
 	// Start Radius
