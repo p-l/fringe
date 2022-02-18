@@ -58,6 +58,7 @@ build: dep ## 🔨 Build and bundle the server with the client built-in
 
 .PHONY: packages
 packages: ## 📦 Build debian packages for easy deployment
+	@rm -rf $(BUILD_PACKAGES_DIR) 
 	mkdir -p $(BUILD_PACKAGES_DIR)
 	GOOS=linux GOARCH=386 ./scripts/build-deb-package.sh
 	GOOS=linux GOARCH=amd64 ./scripts/build-deb-package.sh
