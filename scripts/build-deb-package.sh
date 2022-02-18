@@ -4,7 +4,7 @@
 # https://github.com/influxdata/influxdb/blob/bae5679c2ef1b3b96b21e5bd887c9dc7860a3f8a/package.sh
 set -e
 
-PACKAGES_DIR="artifacts"
+PACKAGES_DIR="packages"
 OUT_DIR="$PACKAGES_DIR"/out
 PKG_DIR="$PACKAGES_DIR"/pkg
 BIN_DIR="bin"
@@ -63,7 +63,6 @@ bundle exec fpm --verbose \
   --description "$DEB_PACKAGE_DESCRIPTION" \
   --url "$DEB_PACKAGE_URL" \
   --version "$VERSION_STRING" \
-  --license LICENSE.md \
   --architecture "$GOARCH" \
   --iteration 1 \
   --output-type deb \
@@ -77,6 +76,3 @@ bundle exec fpm --verbose \
 mv "$OUT_DIR"/"$PACKAGE_FILENAME" "$PACKAGES_DIR/"
 rm -rf "$OUT_DIR"
 rm -rf "$PKG_DIR"
-
-md5sum "$PACKAGES_DIR"/"$PACKAGE_FILENAME" > "$PACKAGES_DIR"/"$PACKAGE_FILENAME".md5
-sha256sum "$PACKAGES_DIR"/"$PACKAGE_FILENAME" > "$PACKAGES_DIR"/"$PACKAGE_FILENAME".sha256

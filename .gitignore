@@ -11,9 +11,11 @@
 *.so
 *.dylib
 
-# Build output
+# Binary output
 bin/
 artifacts/
+packages/
+repo/
 
 # Test binary, built with `go test -c`
 *.test
